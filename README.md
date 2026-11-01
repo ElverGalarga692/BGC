@@ -10,8 +10,14 @@ modos multijugador:
 
 En los dos modos se pueden añadir jugadores controlados por la IA.
 
-El primer juego es **Archipiélago**: coloniza islas hexagonales, recoge
-recursos, comercia y construye.
+Juegos:
+
+- **Archipiélago**: coloniza islas hexagonales, recoge recursos, comercia y
+  construye (2–4 jugadores).
+- **Pests!**: exterminadores rivales en una casa infestada; sella tu nido,
+  elimina tus plagas y atrapa a tu reina antes que nadie (2–6 jugadores).
+  Opciones en el menú: reglas rápidas (exterminadores y cartas al azar) y
+  casa construida al azar.
 
 ## Cómo ejecutarlo
 
@@ -77,8 +83,9 @@ games/archipelago/
     board_view_3d.gd     Vista 3D (mismo contrato), con los modelos de Blender
   assets/models/         Modelos 3D (.glb) exportados desde Blender
     archipelago_screen.gd  Pantalla de juego: HUD, registro, acciones
-games/pests/             Pests! (en desarrollo: aún no aparece en el menú)
+games/pests/             Pests!
   rules.txt              Reglas y aclaraciones de la edición de prueba v1.2
+  pests.tscn             Escena del juego
   logic/
     pests_defs.gd        Especies, habilidades, dado de la reina, costes,
                          losetas (puertas) y cartas de herramientas
@@ -86,8 +93,12 @@ games/pests/             Pests! (en desarrollo: aún no aparece en el menú)
                          invocación, reparto DLUR y salida/reentrada de la reina
     pests_house_generator.gd  Casas aleatorias (partida rápida, IA, tests)
     pests_game.gd        La partida (GameBase): elección de exterminador,
-                         construcción de la casa, reina, acciones, trampas,
-                         cartas de herramientas, victoria y eliminación
+                         cartas, construcción de la casa, reina, acciones,
+                         trampas, victoria y eliminación
+    pests_ai.gd          IA (voraz, versión inicial)
+  view/
+    pests_board_view.gd  Vista 2D de la casa: losetas, puertas, piezas
+    pests_screen.gd      Pantalla de juego: jugadores, registro, acciones, cartas
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -203,3 +214,11 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       de reglas y menú de ajustes (volumen, pantalla completa, 2D/3D,
       velocidad de la IA).
 - [ ] **Siguiente juego** de la colección.
+
+### Opciones de cada juego
+
+Un juego puede declarar opciones en `GameRegistry` (`"options": [{"key",
+"label", "default"}]`). El menú las muestra como casillas y las recuerda
+(`App.game_options()`); la partida las recibe en `App.session["options"]`, se
+guardan con la partida y, en red, se usan las del anfitrión. Cada juego
+declara también cuántas plazas admite en red (`max_players`).

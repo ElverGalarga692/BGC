@@ -61,6 +61,27 @@ func delete_save(game_id: String) -> void:
 		DirAccess.remove_absolute(_save_path(game_id))
 
 
+# --- Opciones de cada juego -------------------------------------------------------
+
+## Opciones elegidas para un juego (las de GameRegistry con sus valores por
+## defecto, cambiadas por lo que el jugador eligió en el menú).
+func game_options(game_id: String) -> Dictionary:
+	var result := {}
+	for option in GameRegistry.find(game_id).get("options", []):
+		result[option["key"]] = option["default"]
+	var saved: Dictionary = get_setting("options_" + game_id, {})
+	for key in saved:
+		if result.has(key):
+			result[key] = saved[key]
+	return result
+
+
+func set_game_option(game_id: String, key: String, value: Variant) -> void:
+	var saved: Dictionary = get_setting("options_" + game_id, {}).duplicate()
+	saved[key] = value
+	set_setting("options_" + game_id, saved)
+
+
 ## Continúa la partida guardada de un juego.
 func continue_game(game_id: String) -> void:
 	var data := load_save(game_id)
@@ -72,6 +93,7 @@ func continue_game(game_id: String) -> void:
 		"players": GameBase.players_from_save(data),
 		"seed": int(data["seed"]),
 		"history": data.get("history", []),
+		"options": data.get("options", game_options(game_id)),
 	}
 	get_tree().change_scene_to_file(game["scene"])
 
@@ -83,6 +105,7 @@ func start_game(game_id: String, players: Array[PlayerInfo], seed: int = -1) -> 
 		"game_id": game_id,
 		"players": players,
 		"seed": BGCRng.random_seed() if seed < 0 else seed,
+		"options": game_options(game_id),
 	}
 	get_tree().change_scene_to_file(game["scene"])
 
@@ -99,7 +122,7 @@ func go_to_menu(notice: String = "") -> void:
 
 
 ## Partida en red: `local_seat` es la plaza del jugador de este equipo.
-func start_network_game(game_id: String, players: Array[PlayerInfo], seed: int, local_seat: int) -> void:
+func start_network_game(game_id: String, players: Array[PlayerInfo], seed: int, local_seat: int, options: Dictionary = {}) -> void:
 	var game := GameRegistry.find(game_id)
 	session = {
 		"game_id": game_id,
@@ -107,6 +130,7 @@ func start_network_game(game_id: String, players: Array[PlayerInfo], seed: int, 
 		"seed": seed,
 		"network": true,
 		"local_seat": local_seat,
+		"options": options if not options.is_empty() else game_options(game_id),
 	}
 	get_tree().change_scene_to_file(game["scene"])
 

@@ -14,6 +14,19 @@ static func all_games() -> Array[Dictionary]:
 			"min_players": 2,
 			"max_players": 4,
 		},
+		{
+			"id": "pests",
+			"name": "Pests!",
+			"description": "Exterminadores rivales en una casa infestada: sella tu nido, elimina tus plagas y atrapa a tu reina antes que nadie.",
+			"scene": "res://games/pests/pests.tscn",
+			"rules": "res://games/pests/rules.txt",
+			"min_players": 2,
+			"max_players": 6,
+			"options": [
+				{"key": "quick_species", "label": "Reglas rápidas: exterminadores y cartas al azar", "default": false},
+				{"key": "auto_house", "label": "Construir la casa al azar", "default": true},
+			],
+		},
 	]
 
 
