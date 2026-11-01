@@ -77,6 +77,14 @@ games/archipelago/
     board_view_3d.gd     Vista 3D (mismo contrato), con los modelos de Blender
   assets/models/         Modelos 3D (.glb) exportados desde Blender
     archipelago_screen.gd  Pantalla de juego: HUD, registro, acciones
+games/pests/             Pests! (en desarrollo: aún no aparece en el menú)
+  rules.txt              Reglas y aclaraciones de la edición de prueba v1.2
+  logic/
+    pests_defs.gd        Especies, habilidades, dado de la reina, costes,
+                         losetas (puertas) y cartas de herramientas
+    pests_house.gd       La casa: colocación de losetas, vecinos, distancias,
+                         invocación, reparto DLUR y salida/reentrada de la reina
+    pests_house_generator.gd  Casas aleatorias (partida rápida, IA, tests)
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
