@@ -249,6 +249,7 @@ func _on_game_chosen(game: Dictionary) -> void:
 		mb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		modes.add_child(mb)
 	_setup_box.add_child(modes)
+	_build_game_options(game)
 
 	_local_content = VBoxContainer.new()
 	_local_content.add_theme_constant_override("separation", 12)
@@ -305,6 +306,22 @@ func _on_game_chosen(game: Dictionary) -> void:
 	_play_button = play
 	_setup_box.add_child(buttons)
 	_show_page(_setup_box)
+
+
+## Casillas con las opciones del juego (si tiene). Se recuerdan entre
+## partidas y en red se usan las del anfitrión.
+func _build_game_options(game: Dictionary) -> void:
+	var options: Array = game.get("options", [])
+	if options.is_empty():
+		return
+	_setup_box.add_child(_section("Opciones"))
+	var current := App.game_options(game["id"])
+	for option in options:
+		var check := CheckBox.new()
+		check.text = option["label"]
+		check.button_pressed = current.get(option["key"], option["default"])
+		check.toggled.connect(func(on: bool) -> void: App.set_game_option(game["id"], option["key"], on))
+		_setup_box.add_child(check)
 
 
 func _set_player_count(n: int) -> void:
@@ -479,7 +496,7 @@ func _on_lobby_changed() -> void:
 		_lobby_box.add_child(_label("Los demás pueden encontrar la partida en la lista o unirse con tu IP: %s" % where, 14, BGCTheme.TEXT_DIM))
 	var lobby_game := GameRegistry.find(Net.game_id)
 	_lobby_box.add_child(_label(lobby_game.get("name", ""), 18, BGCTheme.ACCENT))
-	_lobby_box.add_child(_section("Jugadores (%d/%d)" % [Net.seats.size(), Net.max_players()]))
+	_lobby_box.add_child(_section("Jugadores (%d/%d)" % [Net.seats.size(), Net.max_players]))
 	# Con muchos jugadores, la lista se desplaza para que quepa en pantalla.
 	var seats_scroll := ScrollContainer.new()
 	seats_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -516,7 +533,7 @@ func _on_lobby_changed() -> void:
 			var remove := _button("Quitar", Net.remove_seat.bind(i), "GhostButton", 32)
 			row.add_child(remove)
 		seats_box.add_child(row_panel)
-	if Net.is_host and Net.seats.size() < Net.max_players():
+	if Net.is_host and Net.seats.size() < Net.max_players:
 		var add_row := HBoxContainer.new()
 		add_row.add_theme_constant_override("separation", 8)
 		var level := OptionButton.new()

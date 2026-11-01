@@ -12,10 +12,14 @@ En los dos modos se pueden añadir jugadores controlados por la IA.
 
 Juegos:
 
-- **Archipiélago** (2–4): coloniza islas hexagonales, recoge recursos,
-  comercia y construye.
-- **La Conjura** (5–10): roles ocultos y deducción social. La Guardia Real
-  contra la Hermandad de la Sombra y su Usurpador.
+- **Archipiélago**: coloniza islas hexagonales, recoge recursos, comercia y
+  construye (2–4 jugadores).
+- **Pests!**: exterminadores rivales en una casa infestada; sella tu nido,
+  elimina tus plagas y atrapa a tu reina antes que nadie (2–6 jugadores).
+  Opciones en el menú: reglas rápidas (exterminadores y cartas al azar),
+  casa construida al azar y partida por equipos (4 o 6 jugadores).
+- **La Conjura**: roles ocultos y deducción social; la Guardia Real
+  contra la Hermandad de la Sombra y su Usurpador (5–10 jugadores).
 
 ## Cómo ejecutarlo
 
@@ -81,6 +85,26 @@ games/archipelago/
     board_view_3d.gd     Vista 3D (mismo contrato), con los modelos de Blender
   assets/models/         Modelos 3D (.glb) exportados desde Blender
     archipelago_screen.gd  Pantalla de juego: HUD, registro, acciones
+games/pests/             Pests!
+  rules.txt              Reglas y aclaraciones de la edición de prueba v1.2
+  pests.tscn             Escena del juego
+  logic/
+    pests_defs.gd        Especies, habilidades, dado de la reina, costes,
+                         losetas (puertas) y cartas de herramientas
+    pests_house.gd       La casa: colocación de losetas, vecinos, distancias,
+                         invocación, reparto DLUR y salida/reentrada de la reina
+    pests_house_generator.gd  Casas aleatorias (partida rápida, IA, tests)
+    pests_game.gd        La partida (GameBase): elección de exterminador,
+                         cartas, construcción de la casa, reina, acciones,
+                         trampas, victoria y eliminación
+    pests_ai.gd          IA: fácil (reglas con errores), normal (reglas con
+                         prioridades) y difícil (planifica el turno en copias
+                         de la partida y evalúa el resultado)
+  view/
+    pests_board_view.gd  Vista 2D de la casa, dibujada por código (suelos,
+                         muebles, nidos, bichos, trampas) y animaciones
+    queen_die_view.gd    Dado de la reina con animación de tirada
+    pests_screen.gd      Pantalla de juego: jugadores, registro, acciones, cartas
 games/conjura/
   rules.txt              Reglas del juego
   logic/
@@ -152,7 +176,7 @@ Funcionamiento (`core/net.gd`, autoload `Net`, con ENet de Godot):
   anfitrión, los demás vuelven al menú.
 - El anfitrión se anuncia por difusión UDP (puerto 47811) y la partida usa
   el puerto 47810. Si un cortafuegos los bloquea, hay que permitirlos.
-- Cada juego fija su número de jugadores (Archipiélago 2–4, La Conjura
+- Cada juego fija su número de jugadores (Archipiélago 2–4, Pests! 2–6, La Conjura
   5–10); si faltan personas, el anfitrión completa la mesa con IAs.
 - Varios jugadores pueden actuar a la vez (las votaciones de La Conjura):
   el anfitrión acepta la jugada de cualquier asiento al que le toque.
@@ -247,3 +271,11 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       final con las cartas de rol y el historial de gobiernos, que compara
       lo que dijo cada uno con lo que pasó de verdad y marca las mentiras.
 - [ ] **Siguiente juego** de la colección.
+
+### Opciones de cada juego
+
+Un juego puede declarar opciones en `GameRegistry` (`"options": [{"key",
+"label", "default"}]`). El menú las muestra como casillas y las recuerda
+(`App.game_options()`); la partida las recibe en `App.session["options"]`, se
+guardan con la partida y, en red, se usan las del anfitrión. Cada juego
+declara también cuántas plazas admite en red (`max_players`).

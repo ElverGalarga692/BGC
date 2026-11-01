@@ -1,0 +1,102 @@
+[font_size=26][b]Pests![/b][/font_size]
+Eres un exterminador especializado en una plaga. El dueño de la casa ha contratado a varios: [b]solo cobra el primero que termine su trabajo.[/b]
+
+[font_size=20][b]Cómo se gana[/b][/font_size]
+En cualquier orden: [b]sella tu nido[/b], [b]elimina todas tus plagas[/b] de la casa y [b]atrapa a tu reina[/b] con una trampa. Por último, con el nido sellado y sin plagas, [b]vacía la trampa con tu reina[/b]. El primero en hacerlo gana.
+
+[font_size=20][b]Cómo se pierde[/b][/font_size]
+Si al final de tu turno [b]todas tus plagas disponibles están en la casa[/b], la infestación está completa y quedas eliminado. Las plagas que están en una trampa no cuentan como "en la casa".
+
+[font_size=20][b]Los exterminadores[/b][/font_size]
+• [b]Amarillo — Bichos voladores:[/b] su trampa atrae plagas de las habitaciones vecinas; la reina avanza 2 habitaciones por tirada.
+• [b]Verde — Rastreros escalofriantes:[/b] tiene 2 trampas.
+• [b]Rojo — Bestias aladas:[/b] +1 al exterminar; al poblar, las plagas aparecen a 2 habitaciones.
+• [b]Azul — Alimañas feroces:[/b] su trampa admite 9 plagas.
+• [b]Naranja — Huéspedes indeseados:[/b] sellar su nido cuesta 1 punto; su nido genera 1 plaga más cada turno.
+• [b]Morado — Espectros espeluznantes:[/b] destruir su trampa cuesta 2 puntos; su reina y sus plagas atraviesan paredes.
+
+[font_size=20][b]Preparación[/b][/font_size]
+1. Cada jugador elige exterminador, en sentido antihorario. Después se eligen las cartas de herramientas boca arriba, una a una en sentido horario empezando por el último que eligió exterminador, hasta tener 4 cada uno. Las que sobran forman el mazo. (Con las reglas rápidas, exterminadores y cartas se reparten al azar.)
+2. [b]La casa:[/b] se pone la entrada (la de la rosa de los vientos). Se reparten las losetas y por turnos se colocan una a una. Cada loseta debe tocar la casa, sus puertas deben coincidir con las de al lado (ninguna puerta puede dar a una pared) y al menos una debe conectarla. Las puertas al exterior están permitidas. Tu nido no se puede colocar antes de la 3.ª ronda.
+3. [b]La infestación:[/b] tu exterminador empieza en la entrada y tu reina en tu nido. Pon 3 plagas en tu nido y 4 en las habitaciones conectadas a él, en [b]orden DLUR[/b].
+
+[b]Orden DLUR:[/b] abajo, izquierda, arriba, derecha (según la rosa de los vientos de la entrada). Cuando hay que repartir o desempatar, se sigue este orden, dando la vuelta si hace falta.
+
+[font_size=20][b]Tu turno[/b][/font_size]
+[b]1. La reina.[/b] Tira el dado de la reina (en tu primer turno, dos veces):
+• [b]U / D / L / R:[/b] la reina se mueve arriba, abajo, a la izquierda o a la derecha.
+• [b]S (invocar):[/b] todas tus plagas avanzan una habitación hacia la reina. Si hay varios caminos igual de cortos, se reparten; las que sobran siguen el orden DLUR.
+• [b]P (poblar):[/b] en vez de soltar 1 plaga donde está, la reina reparte 4 en las habitaciones vecinas (orden DLUR).
+Después la reina suelta 1 plaga en su habitación (salvo con P) y sale 1 plaga nueva de tu nido si no está sellado.
+Si la reina no puede hacer su acción (una pared, nada que invocar…), se enfada y suelta 2 plagas en vez de 1.
+Si sale de la casa por una puerta exterior, vuelve a entrar por la puerta más cercana de otra habitación, rodeando la casa por fuera; si hay empate, en el sentido de las agujas del reloj. Si sale a un patio interior sin otra puerta, vuelve a su habitación y suelta 2 plagas.
+Si la reina está atrapada, solo escapa si sale su color en el dado.
+
+[b]2. El exterminador.[/b] Tienes [b]1 movimiento gratis[/b] y luego [b]2 puntos de acción[/b]. Si empiezas con otra acción que no sea moverte, pierdes el movimiento gratis. Los puntos que no uses se pierden.
+• Moverse: 1 por habitación (solo por puertas).
+• Exterminar: 1 — tira el d6 y quita ese número de plagas de tu color de tu habitación. Vuelven a tu reserva.
+• Soltar trampa: 1 (no en tu nido).
+• Vaciar trampa: 1 — si tiene a tu reina, necesitas el nido sellado y ninguna plaga en la casa.
+• Arrastrar trampa: 2 — te mueves con una trampa a la habitación de al lado.
+• Sellar tu nido: 2.
+• Destruir una trampa rival: 1.
+• Desellar un nido rival: 2.
+• Jugar una carta: 1.
+• Comprar una carta: 2.
+
+[font_size=20][b]Cartas de herramientas[/b][/font_size]
+Empiezas con 4. Jugar una cuesta 1 punto de acción y se descarta al final de tu turno. Las que se quedan "delante de un jugador" se descartan cuando se cumple su efecto. Comprar una cuesta 2 puntos (si el mazo se acaba, se roba al azar del descarte).
+[b]Defensivas[/b] (te ayudan a ti):
+• [b]Más tiempo:[/b] 2 acciones extra este turno.
+• [b]Las plagas hibernan[/b] (antes de tirar, gratis): tu reina no actúa y tu nido no genera plagas este turno.
+• [b]Control mental[/b] (antes de tirar, gratis): eliges la acción de tu reina en vez de tirar.
+• [b]Llamada de apareamiento:[/b] tus plagas avanzan 2 habitaciones hacia ti.
+• [b]Colapso de la colonia:[/b] extermina la mitad (redondeando hacia arriba) de tus plagas en la habitación donde más tienes.
+• [b]Bomba insecticida:[/b] elimina todas tus plagas de tu habitación.
+• [b]Bebida energética:[/b] como única acción, muévete hasta 4 habitaciones.
+• [b]Trampa exprés:[/b] suelta y vacía una trampa en tu habitación.
+• [b]Sellado exprés:[/b] sella el nido de tu habitación (aunque sea de otro).
+• [b]Trampa a distancia:[/b] vacía tu trampa aunque esté en otra habitación.
+• [b]De vuelta al nido:[/b] tu reina vuelve a su nido.
+• [b]¡Zas![/b]: extermina hasta 3 de tus plagas en cualquier habitación.
+[b]Ofensivas[/b] (contra un rival):
+• [b]Desellar nido[/b], [b]Trampa rota[/b] (su contenido queda libre), [b]Oleada de plagas[/b] (5 plagas de su nido, aunque esté sellado), [b]Herramientas saboteadas[/b] (descarta una carta suya al azar), [b]Menos que infestar[/b] (5 plagas de su reserva vuelven a la caja), [b]¡Se extienden![/b] (4 plagas suyas alrededor de una habitación donde ya tenga).
+• Se quedan delante del rival: [b]Reina furiosa[/b] (su próxima tirada se hace dos veces), [b]¡Atascado![/b] (su próximo turno sin movimiento gratis y con 1 acción), [b]Persuasión real[/b] (tú eliges la acción de su reina en su próximo turno), [b]De dos en dos[/b] (su nido genera 1 plaga más hasta que lo selle), [b]Fértil[/b] (su reina suelta 1 plaga más hasta que sea atrapada).
+• [b]Buscador de basura:[/b] toma una carta ofensiva del descarte y úsala.
+
+[font_size=20][b]Trampas[/b][/font_size]
+Una trampa guarda 7 plagas de su color [b]o[/b] su reina, nunca las dos cosas. Al soltarla atrapa lo que haya en la habitación y sigue atrapando lo que entre hasta llenarse.
+
+[font_size=20][b]Por equipos (opcional)[/b][/font_size]
+Con 4 o 6 jugadores se puede jugar en dos equipos alternos (jugadores 1, 3 y 5 contra 2, 4 y 6):
+• [b]Ganáis[/b] cuando todos los nidos del equipo están sellados, no queda ninguna plaga del equipo en la casa, todas las reinas del equipo están atrapadas y uno de vosotros vacía la trampa con su reina.
+• [b]Perdéis[/b] si cualquier jugador del equipo tiene todas sus plagas en la casa al final de su turno: cae todo el equipo.
+• Puedes [b]exterminar plagas de cualquier color[/b] (eliges cuáles), pero solo sellas tu nido (salvo con una carta) y tu trampa solo atrapa tu color.
+• Si estás en la misma habitación que un compañero, podéis [b]intercambiar cartas[/b] cuanto queráis durante tu turno, gratis.
+• Las cartas ofensivas, desellar nidos y destruir trampas solo se usan contra el equipo rival.
+
+[font_size=20][b]Aclaraciones de esta versión[/b][/font_size]
+El reglamento original es una edición de prueba (v1.2) y deja algunas dudas. Así se resuelven aquí:
+• [b]Reina roja:[/b] se usa lo que dice su carta (+1 al exterminar y plagas a 2 habitaciones al poblar). El reglamento menciona en una nota que la reina roja invoca, pero eso viene de una versión anterior.
+• [b]Dado de la reina:[/b] cada cara tiene el color del exterminador que lleva esa letra en su carta: L amarillo, R verde, U rojo, S azul, D naranja, P morado.
+• [b]La entrada[/b] ocupa una casilla con puertas arriba, a la izquierda y a la derecha. Su jardín ocupa la casilla de debajo: ahí no se puede poner ninguna loseta.
+• [b]Poblar a 2 habitaciones (rojo):[/b] si no hay habitaciones a esa distancia, se usan las vecinas; si tampoco hay, las plagas se quedan en la habitación de la reina.
+• [b]Volver a entrar en la casa:[/b] se cuenta casilla a casilla por fuera de la casa. Con empate gana la puerta que se alcanza antes girando alrededor de la casa en el sentido de las agujas del reloj y, si aún hay empate, la del orden DLUR. Los espectros (morado) pueden entrar por cualquier pared.
+• [b]Invocar sin camino:[/b] las plagas que no tienen forma de llegar hasta la reina se quedan donde están.
+• [b]Plagas exterminadas:[/b] vuelven a tu reserva (como las de una trampa vaciada), así que pueden volver a salir. Solo las cartas que lo dicen devuelven plagas a la caja. Por eso sellar el nido y atrapar a la reina es imprescindible.
+• [b]Para ganar[/b] no puede quedar ninguna plaga tuya en la casa; las que estén en otra trampa tuya no cuentan.
+• [b]Quién empieza:[/b] el jugador que sale en el dado elige exterminador el primero, coloca la primera loseta y juega el primer turno. Con el orden del reglamento siempre es el mismo jugador.
+• [b]Losetas imposibles:[/b] si un jugador no puede colocar ninguna de sus losetas normales, las devuelve a la caja. Si su nido no cabe en ningún sitio, se coloca adaptando sus puertas a las de alrededor.
+• [b]Infestación inicial:[/b] las 4 plagas van a las habitaciones conectadas por puertas, también para el morado. Al invocar y al poblar, las plagas moradas sí atraviesan paredes.
+• [b]Trampas:[/b] atrapan en cuanto algo de su color está en su habitación (al soltarla, al arrastrarla o cuando entra). Si en una trampa vacía coinciden la reina y plagas, se atrapa lo que eligió su dueño al soltarla (por defecto, la reina). La trampa amarilla atrae también las plagas de las habitaciones conectadas por puertas.
+• [b]Reina atrapada:[/b] aunque no actúe, su nido sigue generando plagas si no está sellado. Si una reina entra en una trampa a mitad de su movimiento, se detiene ahí.
+• [b]Patio interior:[/b] cuenta como no poder actuar: vuelve a su habitación y suelta 2 plagas.
+• [b]Jugador eliminado:[/b] sus plagas, su reina y sus trampas salen de la casa y su turno se salta. Si solo queda un jugador, gana.
+• [b]Control mental y Persuasión real:[/b] la acción se elige al jugar la carta y sirve para una activación de la reina (la primera que quede por decidir). Al no tirar el dado, una reina atrapada no puede escapar con ellas.
+• [b]Reina furiosa:[/b] se tira una vez y la reina hace la acción completa dos veces (incluidas las plagas que suelta); el nido genera plagas una sola vez. Con Persuasión real, la acción elegida se hace dos veces.
+• [b]Primer turno con cartas "antes de tirar":[/b] Las plagas hibernan anula las dos activaciones de la reina; Control mental decide solo una.
+• [b]Colapso de la colonia y ¡Zas![/b]: solo afectan a tus plagas, como exterminar. "La habitación más infestada" es la que más plagas tuyas tiene.
+• [b]Trampa exprés:[/b] atrapa tus plagas de la habitación (o tu reina, si no hay plagas) y se vacía al momento. Si atrapa a tu reina y aún no puedes vaciarla, la trampa se queda puesta.
+• [b]¡Se extienden![/b]: eliges una habitación con plagas de ese jugador y las 4 plagas van a sus habitaciones conectadas, en orden DLUR.
+• [b]Fértil[/b] suma 1 plaga cada vez que la reina suelta plagas.
+• [b]Cartas ofensivas:[/b] siempre se juegan contra un rival que siga en la partida.

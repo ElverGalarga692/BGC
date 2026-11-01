@@ -27,9 +27,11 @@ signal disconnected(reason: String)
 
 const PORT := 47810
 const DISCOVERY_PORT := 47811
-const PROTOCOL := "bgc-2"
-## Conexiones máximas del servidor (el límite real lo pone cada juego).
+const PROTOCOL := "bgc-3"
+## Conexiones máximas del servidor y plazas máximas de cualquier juego
+## (cada juego puede admitir menos: max_players).
 const MAX_CONNECTIONS := 16
+const MAX_PLAYERS := 10
 const ANNOUNCE_INTERVAL := 1.0
 const HOST_TIMEOUT := 3.5
 
@@ -38,6 +40,10 @@ var active := false
 var is_host := false
 var in_game := false
 var game_id := "archipelago"
+## Plazas de la mesa para el juego elegido (lo fija el anfitrión).
+var max_players := 4
+## Opciones de la partida (las del anfitrión).
+var game_options := {}
 var my_name := ""
 ## Plazas de la mesa: [{"peer": id (0 = IA), "name", "ai": nivel}].
 var seats: Array = []
@@ -58,11 +64,7 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(func() -> void: _fail("El anfitrión ha cerrado la partida."))
 
 
-## Jugadores máximos y mínimos del juego de la sala.
-func max_players() -> int:
-	return GameRegistry.find(game_id).get("max_players", 4)
-
-
+## Jugadores mínimos del juego de la sala (el máximo está en max_players).
 func min_players() -> int:
 	return maxi(2, GameRegistry.find(game_id).get("min_players", 2))
 
@@ -92,6 +94,7 @@ func host_game(player_name: String, p_game_id: String = "archipelago", port: int
 	is_host = true
 	in_game = false
 	game_id = p_game_id
+	max_players = mini(MAX_PLAYERS, int(GameRegistry.find(p_game_id).get("max_players", 4)))
 	my_name = player_name
 	seats = [{"peer": 1, "name": player_name, "ai": PlayerInfo.AILevel.HUMAN}]
 	_announcer = PacketPeerUDP.new()
@@ -158,7 +161,7 @@ func _process(delta: float) -> void:
 		_announce_timer -= delta
 		if _announce_timer <= 0.0:
 			_announce_timer = ANNOUNCE_INTERVAL
-			var msg := {"protocol": PROTOCOL, "name": my_name, "game": game_id, "players": seats.size(), "max": max_players(), "port": PORT}
+			var msg := {"protocol": PROTOCOL, "name": my_name, "game": game_id, "players": seats.size(), "max": max_players, "port": PORT}
 			_announcer.put_packet(JSON.stringify(msg).to_utf8_buffer())
 	if _listener != null:
 		var changed := false
@@ -193,7 +196,7 @@ func _register(player_name: String, protocol: String) -> void:
 		_kick.rpc_id(sender, "Versión del juego distinta a la del anfitrión.")
 	elif in_game:
 		_kick.rpc_id(sender, "La partida ya ha empezado.")
-	elif seats.size() >= max_players():
+	elif seats.size() >= max_players:
 		_kick.rpc_id(sender, "La mesa está llena.")
 	else:
 		seats.append({"peer": sender, "name": player_name.substr(0, 16), "ai": PlayerInfo.AILevel.HUMAN})
@@ -206,7 +209,7 @@ func _kick(reason: String) -> void:
 
 
 func add_ai(level: int) -> void:
-	if is_host and seats.size() < max_players() and not in_game:
+	if is_host and seats.size() < max_players and not in_game:
 		seats.append({"peer": 0, "name": "IA %d" % (seats.size() + 1), "ai": level})
 		_sync_lobby()
 
@@ -222,37 +225,39 @@ func remove_seat(index: int) -> void:
 
 
 func _sync_lobby() -> void:
-	_update_lobby.rpc(seats, game_id)
+	_update_lobby.rpc(seats, max_players, game_id)
 	lobby_changed.emit()
 
 
 @rpc("authority", "reliable")
-func _update_lobby(p_seats: Array, p_game_id: String) -> void:
+func _update_lobby(p_seats: Array, p_max_players: int, p_game_id: String) -> void:
 	seats = p_seats
+	max_players = p_max_players
 	game_id = p_game_id
 	lobby_changed.emit()
 
 
 ## Anfitrión: reparte la partida a todos y empieza.
 func start_game() -> void:
-	if not is_host or seats.size() < min_players() or seats.size() > max_players():
+	if not is_host or seats.size() < min_players() or seats.size() > max_players:
 		return
 	in_game = true
 	var players: Array = []
 	for i in seats.size():
 		players.append(PlayerInfo.new(i, seats[i]["name"], PlayerInfo.default_color(i), seats[i]["ai"]).to_dict())
-	_start.rpc(game_id, players, BGCRng.random_seed())
+	_start.rpc(game_id, players, BGCRng.random_seed(), App.game_options(game_id))
 
 
 @rpc("authority", "call_local", "reliable")
-func _start(p_game_id: String, players: Array, seed: int) -> void:
+func _start(p_game_id: String, players: Array, seed: int, options: Dictionary) -> void:
 	in_game = true
 	game_id = p_game_id
+	game_options = options
 	var infos: Array[PlayerInfo] = []
 	for d in players:
 		infos.append(PlayerInfo.from_dict(d))
 	game_started.emit()
-	App.start_network_game(p_game_id, infos, seed, local_seat())
+	App.start_network_game(p_game_id, infos, seed, local_seat(), options)
 
 
 # --- Durante la partida ----------------------------------------------------------------
