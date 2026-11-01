@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#1f3b57"/>
+  <polygon points="64,14 107,39 107,89 64,114 21,89 21,39" fill="#e9c46a" stroke="#f4f1de" stroke-width="5"/>
+  <text x="64" y="76" font-family="sans-serif" font-size="30" font-weight="bold" fill="#1f3b57" text-anchor="middle">BGC</text>
+</svg>
