@@ -1,0 +1,42 @@
+[font_size=26][b]La Conjura[/b][/font_size]
+Un juego de roles ocultos para 5–10 jugadores. En la corte, la [b]Guardia Real[/b] (mayoría) intenta gobernar bien, mientras la [b]Hermandad de la Sombra[/b] (minoría) conspira en secreto para que su líder, el [b]Usurpador[/b], se haga con el poder.
+
+[font_size=20][b]Roles[/b][/font_size]
+[table=3]
+[cell][b]Jugadores[/b]   [/cell][cell][b]Guardia[/b]   [/cell][cell][b]Sombra[/b][/cell]
+[cell]5 – 6[/cell][cell]3 – 4[/cell][cell]1 + Usurpador[/cell]
+[cell]7 – 8[/cell][cell]4 – 5[/cell][cell]2 + Usurpador[/cell]
+[cell]9 – 10[/cell][cell]5 – 6[/cell][cell]3 + Usurpador[/cell]
+[/table]
+• La Guardia no sabe quién es quién.
+• Los de la Sombra se conocen entre sí y saben quién es el Usurpador.
+• El Usurpador conoce a sus aliados solo con 5 o 6 jugadores; con más, no sabe quiénes son.
+
+[font_size=20][b]Una ronda[/b][/font_size]
+1. [b]Nominación.[/b] El [b]Regente[/b] (cambia cada ronda, en orden) nomina a un [b]Consejero[/b]. No puede nominar a quien fue el último Consejero elegido.
+2. [b]Votación.[/b] Todos votan a la vez si aprueban el gobierno. Se aprueba con [b]más de la mitad[/b] de los votos (el empate lo rechaza). Los votos se revelan al final.
+3. [b]Legislatura[/b] (si se aprueba). El Regente roba [b]3 edictos[/b], descarta 1 en secreto y pasa 2 al Consejero, que [b]promulga 1[/b] y descarta el otro. Nadie más ve las cartas: cada uno puede decir lo que quiera sobre ellas… o mentir.
+
+[font_size=20][b]Los edictos[/b][/font_size]
+El mazo tiene [b]6 de la Guardia, 10 de la Sombra y 3 neutrales[/b]. Cuando quedan menos de 3, se baraja el descarte.
+• [b]De la Guardia[/b] y [b]de la Sombra[/b]: avanzan la pista de su facción.
+• [b]Neutral[/b]: sube el [b]descontento[/b] del pueblo.
+
+[font_size=20][b]Crisis[/b][/font_size]
+Si se rechazan [b]3 gobiernos seguidos[/b], hay crisis: se promulga directamente el primer edicto del mazo (sin poderes), sube el descontento y se olvida el límite de mandatos.
+
+[font_size=20][b]Poderes[/b][/font_size]
+Desde el [b]2.º edicto de la Sombra[/b], cada vez que un gobierno promulga uno, el [b]Consejero[/b] roba 2 cartas de poder, elige 1 y la usa (la otra vuelve al mazo):
+• [b]Espiar[/b]: mira en secreto la facción de otro jugador (el Usurpador aparece como Sombra).
+• [b]Augurio[/b]: mira en secreto los 3 primeros edictos del mazo.
+• [b]Sucesión[/b]: elige al próximo Regente (después, el orden sigue normal).
+• [b]Destierro[/b]: un jugador queda fuera de la partida (no vota ni gobierna).
+• [b]Pesquisa[/b]: mira en secreto el edicto que descartó el Regente.
+
+[font_size=20][b]Victoria[/b][/font_size]
+[b]Gana la Guardia[/b] si promulga [b]5 edictos[/b] de la Guardia o si [b]destierra al Usurpador[/b].
+[b]Gana la Sombra[/b] si promulga [b]6 edictos[/b] de la Sombra o si el [b]Usurpador sale elegido Consejero[/b] cuando ya hay 3 o más edictos de la Sombra.
+[b]Rebelión:[/b] si el descontento llega a [b]4[/b], el pueblo se rebela y gana la facción con [b]menos[/b] edictos promulgados (si empatan, la Guardia).
+
+[font_size=20][b]Jugar en un solo equipo[/b][/font_size]
+Si varias personas comparten el ordenador, cada vez que haya algo secreto (tu rol, votar, tus edictos, el resultado de un poder) aparecerá una pantalla de [b]«Pasa el dispositivo a…»[/b]. Pulsa «mostrar» solo cuando nadie más mire. Con «Ver mi información» puedes repasar tu rol y lo que has descubierto.

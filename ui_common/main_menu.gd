@@ -7,6 +7,9 @@ extends Control
 
 const MAX_NAME_LENGTH := 16
 const COLUMN_WIDTH := 580.0
+## Filas de jugadores visibles sin desplazar (y su altura aproximada).
+const MAX_VISIBLE_ROWS := 5
+const PLAYER_ROW_HEIGHT := 54.0
 
 var _pages: Control
 var _games_box: VBoxContainer
@@ -23,6 +26,7 @@ var _selected_game: Dictionary = {}
 var _player_count := 3
 var _count_buttons: Array[Button] = []
 var _players_list: VBoxContainer
+var _players_scroll: ScrollContainer
 var _name_edits: Array[LineEdit] = []
 var _color_pickers: Array[ColorPickerButton] = []
 var _ai_options: Array[OptionButton] = []
@@ -234,6 +238,7 @@ func _on_game_chosen(game: Dictionary) -> void:
 
 	var modes := HBoxContainer.new()
 	modes.add_theme_constant_override("separation", 8)
+	modes.visible = game.get("network", true)
 	var mode_group := ButtonGroup.new()
 	for entry in [["En este equipo", false], ["En red local", true]]:
 		var mb := _button(entry[0], _set_network_mode.bind(entry[1]), "", 42)
@@ -271,9 +276,14 @@ func _on_game_chosen(game: Dictionary) -> void:
 		_count_buttons.append(b)
 	_local_content.add_child(count_row)
 
+	# Con muchos jugadores, la lista se desplaza para que quepa en pantalla.
+	_players_scroll = ScrollContainer.new()
+	_players_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_local_content.add_child(_players_scroll)
 	_players_list = VBoxContainer.new()
 	_players_list.add_theme_constant_override("separation", 8)
-	_local_content.add_child(_players_list)
+	_players_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_players_scroll.add_child(_players_list)
 	_name_edits.clear()
 	_color_pickers.clear()
 	_ai_options.clear()
@@ -341,6 +351,7 @@ func _rebuild_player_rows() -> void:
 		var row := _players_list.get_child(_players_list.get_child_count() - 1)
 		_players_list.remove_child(row)
 		row.queue_free()
+	_players_scroll.custom_minimum_size.y = minf(_player_count, MAX_VISIBLE_ROWS) * PLAYER_ROW_HEIGHT
 
 
 func _on_play() -> void:

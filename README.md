@@ -10,8 +10,12 @@ modos multijugador:
 
 En los dos modos se pueden añadir jugadores controlados por la IA.
 
-El primer juego es **Archipiélago**: coloniza islas hexagonales, recoge
-recursos, comercia y construye.
+Juegos:
+
+- **Archipiélago** (2–4): coloniza islas hexagonales, recoge recursos,
+  comercia y construye.
+- **La Conjura** (5–10): roles ocultos y deducción social. La Guardia Real
+  contra la Hermandad de la Sombra y su Usurpador.
 
 ## Cómo ejecutarlo
 
@@ -77,6 +81,17 @@ games/archipelago/
     board_view_3d.gd     Vista 3D (mismo contrato), con los modelos de Blender
   assets/models/         Modelos 3D (.glb) exportados desde Blender
     archipelago_screen.gd  Pantalla de juego: HUD, registro, acciones
+games/conjura/
+  rules.txt              Reglas del juego
+  logic/
+    conjura_defs.gd      Roles, edictos, poderes, reparto y umbrales de victoria
+    conjura_game.gd      La partida (GameBase): fases, votación, legislatura,
+                         crisis, poderes y view_for(seat)
+    conjura_ai.gd        IA básica (solo usa view_for: no hace trampa)
+  view/
+    conjura_board.gd     Tablero público: pistas, descontento, crisis, mazo
+    conjura_screen.gd    Pantalla: jugadores, registro, acciones y ventana
+                         privada con cortina de «Pasa el dispositivo»
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -142,6 +157,19 @@ Funcionamiento (`core/net.gd`, autoload `Net`, con ENet de Godot):
   variable de entorno `BGC_AUTOPLAY=1`, los jugadores humanos de esa
   ventana juegan solos (útil para pruebas automáticas).
 
+### Información oculta (La Conjura)
+
+La partida guarda el estado completo, pero la interfaz y la IA solo leen
+`ConjuraGame.view_for(seat)`: la proyección de lo que ese asiento puede saber
+(su rol, sus aliados, sus edictos en mano, lo que ha descubierto con poderes;
+los votos ajenos solo cuando se resuelve la votación). `view_for(-1)` es la
+vista pública. Los tests comprueban que no se filtra nada.
+
+En un solo equipo con varias personas, todo lo secreto aparece tras una
+cortina de «Pasa el dispositivo a X». Si solo hay una persona (y el resto
+son IA), su rol se ve siempre en el panel derecho. La red local para este
+juego llegará en la Fase 4 (por ahora el menú solo ofrece jugar en un equipo).
+
 ### Sonido
 
 Los efectos se sintetizan al arrancar (`core/sfx.gd`), así que no hay
@@ -191,4 +219,11 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       sintetizados, guardado automático con "Continuar partida", pantalla
       de reglas y menú de ajustes (volumen, pantalla completa, 2D/3D,
       velocidad de la IA).
-- [ ] **Siguiente juego** de la colección.
+- [x] **La Conjura, fases 1 y 2.** Lógica con información oculta por
+      asiento (`view_for`), votación simultánea, crisis, poderes elegibles,
+      descontento y cuatro formas de ganar; tests de reglas y de filtrado;
+      pantalla jugable en un equipo con cortina para lo secreto e IA básica.
+- [ ] **La Conjura, fase 3: IA.** Declaraciones (verdad o mentira),
+      deducción y equilibrio de victorias entre facciones.
+- [ ] **La Conjura, fase 4: red local.** Votos de varios asientos a la vez.
+- [ ] **La Conjura, fase 5: pulido.** Arte, sonido e historial final.

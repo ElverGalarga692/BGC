@@ -14,6 +14,17 @@ static func all_games() -> Array[Dictionary]:
 			"min_players": 2,
 			"max_players": 4,
 		},
+		{
+			"id": "conjura",
+			"name": "La Conjura",
+			"description": "Roles ocultos y engaños en la corte: la Guardia Real contra la Hermandad de la Sombra y su Usurpador.",
+			"scene": "res://games/conjura/conjura.tscn",
+			"rules": "res://games/conjura/rules.txt",
+			"min_players": 5,
+			"max_players": 10,
+			# Red local: llegará en la Fase 4 (información oculta por asiento).
+			"network": false,
+		},
 	]
 
 

@@ -9,6 +9,10 @@ const DEFAULT_COLORS: Array[Color] = [
 	Color("f2f2f2"),  # blanco
 	Color("4caf50"),  # verde
 	Color("8e5bd6"),  # morado
+	Color("2bb5b8"),  # turquesa
+	Color("e86fb0"),  # rosa
+	Color("a8743c"),  # marrón
+	Color("9aa3ad"),  # gris
 ]
 
 ## Niveles de IA (0 = jugador humano).
