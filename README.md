@@ -50,6 +50,9 @@ core/                    Compartido por todos los juegos
   hex_grid.gd            Topología: casillas, vértices, aristas
 ui_common/
   main_menu.gd           Selector de juego, jugadores, ajustes y "Continuar"
+  bgc_theme.gd           Tema visual de los menús (botones, paneles, campos)
+  menu_background.gd     Fondo animado del menú (hexágonos flotantes)
+  hex_emblem.gd          Emblema de hexágonos (título y tarjetas de juego)
   dice_view.gd           Dados con animación de tirada
   rules_panel.gd         Ventana de reglas (texto BBCode de cada juego)
 games/archipelago/

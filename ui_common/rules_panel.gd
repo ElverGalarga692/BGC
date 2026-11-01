@@ -25,6 +25,7 @@ func _build(path: String) -> void:
 	add_child(center)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(760, 600)
+	panel.add_theme_stylebox_override("panel", BGCTheme.box(Color("0d2238"), Color(1, 1, 1, 0.12), 18, 1, 16, 18))
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
