@@ -12,6 +12,14 @@ recursos, comercia y construye.
 2. Pulsa F5. Para abrir directamente el tablero, abre
    `games/archipelago/archipelago.tscn` y pulsa F6.
 
+### Controles del tablero 3D
+
+- Clic izquierdo: elegir casilla, esquina o lado.
+- Clic derecho o Esc: cancelar la construcción en curso.
+- Rueda del ratón: zoom.
+- Botón central (arrastrar) o teclas Q / E: girar la cámara.
+- "Cambiar a vista 2D/3D" en el panel izquierdo (se recuerda la elección).
+
 ### Tests
 
 ```bash
@@ -51,18 +59,20 @@ games/archipelago/
     arch_card_tracker.gd Contador de cartas de la IA difícil
   view/                  Escenas y dibujo
     board_view.gd        Vista 2D: tablero, piezas, objetivos y detección
+    board_view_3d.gd     Vista 3D (mismo contrato), todo generado por código
     archipelago_screen.gd  Pantalla de juego: HUD, registro, acciones
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
-### Vistas intercambiables (2D hoy, 3D en el futuro)
+### Vistas intercambiables (2D y 3D)
 
 La pantalla solo habla con la vista del tablero a través de un contrato
 pequeño, documentado en `board_view.gd`: la propiedad `game`,
 `set_targets()`, `refresh()`, `fit()` y las señales `hovered` y `clicked`.
-La detección trabaja en "unidades de hexágono" con `HexGrid`, así que una
-vista 3D solo tiene que proyectar el rayo del ratón sobre el plano del
-tablero y reutilizar esa misma detección.
+La detección trabaja en "unidades de hexágono" (`ArchBoardView.pick_unit`):
+la vista 3D proyecta el rayo del ratón sobre el plano del tablero y reutiliza
+esa misma función. Las mallas 3D (fichas, decoración, piezas) se generan por
+código; se pueden sustituir más adelante por modelos importados.
 
 ### Añadir un juego nuevo
 
@@ -88,5 +98,9 @@ tablero y reutilizar esa misma detección.
 - [x] **Fase 4: IA.** Tres niveles por jugador (fácil, normal y difícil). La
       difícil cuenta cartas con información pública y está ajustada con
       torneos: gana ~43 % de las partidas contra tres IAs normales.
-- [ ] **Fase 5: pulido.** Animaciones, sonido, guardar y cargar, tutorial.
+- [x] **Vista 3D.** Tablero en 3D con decoración por terreno, piezas que
+      caen al colocarse, bandido animado y cámara orbital; se puede volver
+      a la vista 2D en cualquier momento.
+- [ ] **Fase 5: pulido.** Más animaciones (dados, recursos), sonido, guardar
+      y cargar, tutorial, ajustes.
 - [ ] **Siguiente juego** de la colección.

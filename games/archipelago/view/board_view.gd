@@ -67,9 +67,9 @@ static func extent() -> Vector2:
 	return Vector2(SEA_RADIUS * 2.0, SEA_RADIUS * HexCoords.SQRT3)
 
 
-func set_targets(kind: Pick, ids: Array[int]) -> void:
+func set_targets(kind: Pick, ids: Array) -> void:
 	_target_kind = kind if not ids.is_empty() else Pick.NONE
-	_target_ids = ids
+	_target_ids.assign(ids)
 	_hover = pick_at(get_local_mouse_position())
 	queue_redraw()
 
@@ -95,16 +95,33 @@ func _process(delta: float) -> void:
 func pick_at(local_point: Vector2) -> Array:
 	if board == null:
 		return [Pick.NONE, -1]
-	var p := local_point / hex_size
-	if _target_kind != Pick.NONE:
-		return _pick_target(p)
-	var v := board.grid.vertex_near(p, VERTEX_PICK_RADIUS)
+	return pick_unit(board, local_point / hex_size, _target_kind, _target_ids)
+
+
+## Qué hay en el punto `p` (en unidades de hexágono). Si hay objetivos
+## marcados, solo devuelve uno de ellos. La comparten la vista 2D y la 3D.
+static func pick_unit(p_board: ArchBoard, p: Vector2, target_kind: Pick, target_ids: Array[int]) -> Array:
+	var grid := p_board.grid
+	if target_kind == Pick.TILE:
+		var t := grid.tile_at(p)
+		return [Pick.TILE, t] if t in target_ids else [Pick.NONE, -1]
+	if target_kind != Pick.NONE:
+		var best := -1
+		var best_d := 0.5
+		for id in target_ids:
+			var pos := grid.vertex_positions[id] if target_kind == Pick.VERTEX else grid.edge_midpoint(id)
+			var d := pos.distance_to(p)
+			if d < best_d:
+				best = id
+				best_d = d
+		return [target_kind, best] if best >= 0 else [Pick.NONE, -1]
+	var v := grid.vertex_near(p, VERTEX_PICK_RADIUS)
 	if v >= 0:
 		return [Pick.VERTEX, v]
-	var e := board.grid.edge_near(p, EDGE_PICK_RADIUS)
+	var e := grid.edge_near(p, EDGE_PICK_RADIUS)
 	if e >= 0:
 		return [Pick.EDGE, e]
-	var t := board.grid.tile_at(p)
+	var t := grid.tile_at(p)
 	if t >= 0:
 		return [Pick.TILE, t]
 	return [Pick.NONE, -1]
@@ -122,25 +139,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if pick[0] != Pick.NONE:
 			clicked.emit(pick[0], pick[1])
 			get_viewport().set_input_as_handled()
-
-
-func _pick_target(p: Vector2) -> Array:
-	if _target_kind == Pick.TILE:
-		var t := board.grid.tile_at(p)
-		return [Pick.TILE, t] if t in _target_ids else [Pick.NONE, -1]
-	var best := -1
-	var best_d := 0.5
-	for id in _target_ids:
-		var pos: Vector2
-		match _target_kind:
-			Pick.VERTEX: pos = board.grid.vertex_positions[id]
-			Pick.EDGE: pos = board.grid.edge_midpoint(id)
-			Pick.TILE: pos = board.grid.tile_center(id)
-		var d := pos.distance_to(p)
-		if d < best_d:
-			best = id
-			best_d = d
-	return [_target_kind, best] if best >= 0 else [Pick.NONE, -1]
 
 
 func _draw() -> void:

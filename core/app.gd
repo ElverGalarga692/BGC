@@ -3,10 +3,28 @@ extends Node
 ## (qué juego se juega, con qué jugadores y qué semilla).
 
 const MAIN_MENU := "res://main.tscn"
+const SETTINGS_PATH := "user://settings.cfg"
 
 ## Configuración de la partida en curso:
 ## {"game_id": String, "players": Array[PlayerInfo], "seed": int}
 var session: Dictionary = {}
+
+
+var _settings := ConfigFile.new()
+
+
+func _ready() -> void:
+	_settings.load(SETTINGS_PATH)  # si no existe, se usan los valores por defecto
+
+
+## Ajustes del usuario que se guardan entre sesiones (p. ej. vista 2D/3D).
+func get_setting(key: String, default: Variant) -> Variant:
+	return _settings.get_value("general", key, default)
+
+
+func set_setting(key: String, value: Variant) -> void:
+	_settings.set_value("general", key, value)
+	_settings.save(SETTINGS_PATH)
 
 
 func start_game(game_id: String, players: Array[PlayerInfo], seed: int = -1) -> void:

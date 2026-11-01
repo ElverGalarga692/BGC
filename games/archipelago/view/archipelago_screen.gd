@@ -28,7 +28,11 @@ var game: ArchipelagoGame
 var _mode := Mode.NONE
 var _log: Array[String] = []
 
-var _board_view: ArchBoardView
+## Vista del tablero: ArchBoardView (2D) o ArchBoardView3D. Ambas cumplen el
+## mismo contrato (game, set_targets, refresh, fit, hovered, clicked).
+var _board_view
+var _is_3d := true
+var _view_button: Button
 var _players_box: VBoxContainer
 var _log_label: RichTextLabel
 var _hover_label: Label
@@ -70,14 +74,10 @@ func _ready() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
-	_board_view = ArchBoardView.new()
-	add_child(_board_view)
-	_board_view.hovered.connect(_on_hovered)
-	_board_view.clicked.connect(_on_board_clicked)
-
 	_build_left_panel()
 	_build_right_panel()
 	_build_overlays()
+	_set_view_3d(App.get_setting("board_3d", true), false)
 	resized.connect(_layout)
 	_start(App.session_seed())
 
@@ -163,6 +163,8 @@ func _build_left_panel() -> void:
 	_hover_label.modulate = Color(1, 1, 1, 0.7)
 	_hover_label.custom_minimum_size = Vector2(0, 36)
 	box.add_child(_hover_label)
+	_view_button = _button("", func() -> void: _set_view_3d(not _is_3d))
+	box.add_child(_view_button)
 	_ai_fast_toggle = CheckButton.new()
 	_ai_fast_toggle.text = "IA rápida"
 	box.add_child(_ai_fast_toggle)
@@ -308,6 +310,27 @@ func _layout() -> void:
 	_banner.size = board_rect.size
 	_victory.reset_size()
 	_victory.position = board_rect.get_center() - _victory.size / 2.0
+
+
+## Cambia entre la vista 2D y la 3D (y guarda la preferencia).
+func _set_view_3d(enable: bool, save: bool = true) -> void:
+	_is_3d = enable
+	if save:
+		App.set_setting("board_3d", enable)
+	if _board_view != null:
+		remove_child(_board_view)
+		_board_view.queue_free()
+	_board_view = ArchBoardView3D.new() if enable else ArchBoardView.new()
+	add_child(_board_view)
+	move_child(_board_view, 1)  # justo encima del fondo, debajo de paneles y ventanas
+	_board_view.hovered.connect(_on_hovered)
+	_board_view.clicked.connect(_on_board_clicked)
+	_view_button.text = "Cambiar a vista 2D" if enable else "Cambiar a vista 3D"
+	if game != null:
+		_board_view.game = game
+		_layout()
+		_refresh()
+		_board_view.refresh()
 
 
 # --- Estado -> interfaz -------------------------------------------------------
