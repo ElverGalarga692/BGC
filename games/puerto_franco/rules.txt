@@ -1,0 +1,59 @@
+[font_size=26][b]Puerto Franco[/b][/font_size]
+Cada jugador es una familia de mercaderes que levanta su barrio alrededor de la Lonja. Cada ronda, el consejo del puerto reparte sus cargos: elígelos en secreto, puja por ellos y construye edificios que se apoyen unos a otros. [b]Gana quien tenga más puntos cuando alguien complete su barrio.[/b]
+
+[font_size=20][b]Material[/b][/font_size]
+• [b]65 cartas de edificio[/b] de cuatro gremios (Comercio, Mar, Oficios y Artes), con costes del 1 al 5, y 9 [b]maravillas[/b] únicas.
+• [b]7 cargos[/b] del consejo, numerados del 1 al 7.
+• [b]Monedas[/b] y la [b]vara[/b] de mando.
+• Un [b]barrio[/b] por jugador: un hexágono de 19 casillas con la Lonja en el centro.
+
+[font_size=20][b]Preparación[/b][/font_size]
+Cada jugador recibe 3 monedas y 4 cartas. Se ponen 4 cartas boca arriba en el [b]muelle[/b]. Se sacan al azar [b]2 objetivos públicos[/b] para la partida. Un jugador al azar coge la vara.
+
+[font_size=20][b]1. Elección de cargos[/b][/font_size]
+Todos eligen [b]a la vez y en secreto[/b] un cargo y cuántas monedas pujan por él (puede ser 0). Después se revela todo:
+• Si solo una persona eligió un cargo, se lo queda y paga lo que pujó.
+• Si varias eligieron el mismo, se lo queda [b]la puja más alta[/b], que la paga. Si empatan, gana quien va antes empezando por quien tiene la vara y siguiendo el orden de los asientos. Los demás no pagan nada.
+• Los que se quedaron sin cargo eligen, en ese mismo orden, uno de los [b]cargos vacantes[/b] (gratis).
+Cada cargo que nadie ocupa gana [b]1 moneda[/b] encima (hasta 3). Quien lo ocupe en otra ronda se queda esas monedas.
+
+[font_size=20][b]2. Turnos[/b][/font_size]
+Se juega en orden de cargo, del 1 al 7. En tu turno:
+1. [b]Cobras[/b] (obligatorio, antes de construir), de una de estas formas:
+   • 2 monedas;
+   • 1 carta del muelle (que se repone);
+   • 1 carta a ciegas del mazo y 1 moneda.
+2. [b]Usas tu cargo[/b] si quieres (una vez, en cualquier momento del turno).
+3. [b]Construyes[/b] 1 edificio: pagas su coste y lo pones en una casilla libre de tu barrio [b]vecina de algo ya construido[/b] (o de la Lonja).
+
+[font_size=20][b]Los cargos[/b][/font_size]
+1. [b]Capitana de puerto:[/b] coge gratis 1 carta del muelle. Después se descarta el resto y se saca un muelle nuevo.
+2. [b]Contrabandista:[/b] coge 1 carta al azar de la mano de otro jugador y dale 1 moneda a cambio (si tienes).
+3. [b]Recaudadora:[/b] cada jugador con más edificios que tú te paga 1 moneda (si tiene).
+4. [b]Urbanista:[/b] tus edificios cuestan 1 menos este turno. Además puedes trasladar uno de tus edificios a otra casilla libre, siempre que todo el barrio siga unido a la Lonja.
+5. [b]Maestra de obras:[/b] puedes construir 2 edificios este turno.
+6. [b]Mecenas:[/b] gana 1 moneda por cada grupo de vecinos del mismo gremio que haya en tu barrio (máximo 4).
+7. [b]Alcaldesa:[/b] al empezar tu turno coges la vara y robas 1 carta.
+
+[font_size=20][b]Las maravillas[/b][/font_size]
+• [b]Gran Mercado, Arsenal, Casa de los Gremios y Museo:[/b] +1 punto por cada edificio de Comercio, Mar, Oficios o Artes (respectivamente) de tu barrio.
+• [b]Plaza Mayor:[/b] +2 puntos por cada edificio vecino.
+• [b]Aduana:[/b] cuando cobras monedas, cobras 1 más.
+• [b]Astillero Real:[/b] cuando cobras del muelle, robas además 1 carta a ciegas.
+• [b]Jardines:[/b] cuentan como de cualquier gremio para formar grupos.
+• [b]Faro:[/b] al final, +1 punto por cada 2 monedas que te queden.
+
+[font_size=20][b]Fin de la partida[/b][/font_size]
+Cuando alguien tiene [b]9 edificios[/b] (la Lonja no cuenta), se termina la ronda y acaba la partida. Puntos:
+• El [b]coste[/b] de cada edificio.
+• [b]Grupos:[/b] cada grupo de 2 o más edificios vecinos del mismo gremio da 1 punto por edificio.
+• Los puntos de las [b]maravillas[/b].
+• [b]Objetivos:[/b] 4 puntos a quien cumpla mejor cada objetivo público (si empatan, todos los cobran).
+• [b]+3 puntos[/b] a quien completó el barrio primero.
+Gana quien más puntos tenga; si empatan, quien tenga más monedas, y si siguen empatados comparten la victoria.
+
+[font_size=20][b]Objetivos públicos[/b][/font_size]
+• [b]Plaza de los mercaderes, Muelle animado, Calle de los talleres y Barrio de las artes:[/b] más edificios de Comercio, Mar, Oficios o Artes.
+• [b]Manzana perfecta:[/b] el grupo de vecinos del mismo gremio más grande.
+• [b]Arcas llenas:[/b] más monedas al final.
+• [b]Ciudad de maravillas:[/b] más maravillas.

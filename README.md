@@ -133,6 +133,13 @@ games/bajamar/           Bajamar
     bajamar_screen.gd    Pantalla: marcador, mesa (mazo, mercado, descartes),
                          barcas con sus redes, acciones con los puntos de
                          cada opción, resumen de ronda y pantalla final
+games/puerto_franco/     Puerto Franco (en desarrollo, aún no está en el menú)
+  rules.txt              Reglas del juego
+  logic/
+    puerto_defs.gd       Gremios, edificios y maravillas (cartas = enteros),
+                         cargos, objetivos, barrio hexagonal y puntuación
+    puerto_game.gd       La partida (GameBase): elección secreta de cargos con
+                         puja, vacantes, turnos, habilidades, construir y final
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -326,6 +333,27 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       nadie bloquee. El resumen y la pantalla final enseñan las cartas de
       cada red (las rotas, oscurecidas), el riesgo de tormenta cambia de
       color y hay sonidos propios (trueno, gaviota y ola).
+- [x] **Puerto Franco, fases 0 y 1.** Juego original de cargos secretos y
+      barrios hexagonales (2 a 6 jugadores). Cada ronda todos eligen a la vez
+      un cargo y una puja; la puja más alta se lo queda, los empates van por
+      la vara y quien pierde elige entre los vacantes, que acumulan monedas.
+      Turnos en orden de cargo: cobrar (monedas, muelle o a ciegas), usar el
+      cargo (Capitana de puerto, Contrabandista, Recaudadora, Urbanista,
+      Maestra de obras, Mecenas y Alcaldesa) y construir en el barrio,
+      vecino de lo que ya hay. Puntos por coste, grupos de vecinos del mismo
+      gremio, 9 maravillas, 2 objetivos públicos y terminar primero.
+      Información oculta con `view_for`. Tests de reglas, determinismo y
+      guardado. Primera simulación con una estrategia sencilla: ~9–10
+      rondas por partida; con 6 jugadores puntúan menos (faltan cartas), a
+      revisar al equilibrar con la IA.
+- [ ] **Puerto Franco, fase 2:** IA (fácil, normal y difícil) y equilibrio
+      con simulaciones (pujas, cargos, número de cartas por jugadores).
+- [ ] **Puerto Franco, fase 3:** pantalla 2D (mesa de cargos, mano, barrio
+      y barrios rivales), cortina de «Pasa el dispositivo» para la elección
+      secreta y entrada en el menú.
+- [ ] **Puerto Franco, fase 4:** red local (elección simultánea sin revelar).
+- [ ] **Puerto Franco, fase 5:** pulido (cartas y edificios dibujados por
+      código, animaciones y sonidos).
 
 ### Opciones de cada juego
 
