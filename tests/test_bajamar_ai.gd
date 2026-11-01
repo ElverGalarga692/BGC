@@ -144,3 +144,12 @@ func _big_net() -> Array[int]:
 		for v in range(1, 7):
 			net.append(D.fish(s, v))
 	return net
+
+
+func test_registered_in_menu() -> void:
+	var entry := GameRegistry.find("bajamar")
+	assert_false(entry.is_empty(), "Bajamar está en el registro")
+	assert_true(ResourceLoader.exists(entry["scene"]), "existe la escena")
+	assert_true(FileAccess.file_exists(entry["rules"]), "existe el reglamento")
+	assert_eq(entry["min_players"], 2)
+	assert_eq(entry["max_players"], 6)

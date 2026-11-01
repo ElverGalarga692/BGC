@@ -119,7 +119,7 @@ games/conjura/
     vote_reveal.gd       Revelación animada de cada votación
     conjura_screen.gd    Pantalla: jugadores, registro, acciones y ventana
                          privada con cortina de «Pasa el dispositivo»
-games/bajamar/           Bajamar (en desarrollo: aún no está en el menú)
+games/bajamar/           Bajamar
   rules.txt              Reglas del juego
   logic/
     bajamar_defs.gd      Cartas (enteros), mazo y puntuación de una red
@@ -127,6 +127,12 @@ games/bajamar/           Bajamar (en desarrollo: aún no está en el menú)
                          especiales, volver a puerto, puntos y fin de partida
     bajamar_ai.gd        IA (fácil, normal y difícil); cuenta cartas solo con
                          lo que está a la vista
+  view/
+    bajamar_art.gd       Cartas dibujadas por código (peces, tormenta,
+                         especiales, reverso) y BajamarCard con volteo
+    bajamar_screen.gd    Pantalla: marcador, mesa (mazo, mercado, descartes),
+                         barcas con sus redes, acciones con los puntos de
+                         cada opción, resumen de ronda y pantalla final
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -304,8 +310,14 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       todavía empata con la normal (49 % en 500 duelos), porque maximizar
       los puntos esperados de cada ronda ya es casi lo mejor que se puede
       hacer; solo gana algo en la última ronda.
-- [ ] **Bajamar, fase 4: pantalla.** Mesa 2D con redes, mercado y mazo,
-      volteo de cartas y sonidos; el juego aparece en el menú.
+- [x] **Bajamar, fase 4: pantalla.** Mesa 2D con el mazo (y el riesgo de
+      tormenta), el mercado (se puede pulsar una carta para cogerla) y los
+      descartes; una barca por jugador con su red; botones con los puntos que
+      daría cada opción y desglose de la red; elección de víctima de la
+      Gaviota; cartas que se voltean al aparecer, barcas que se tiñen de rojo
+      al romperse la red, rótulos y sonidos; resumen al final de cada ronda
+      (se cierra solo si solo juegan IAs) y pantalla final. Atajos: R, P y
+      1-3. El juego ya aparece en el menú, con guardado automático.
 - [ ] **Bajamar, fase 5: red local y pulido.** Resumen de cada ronda,
       animaciones y ajustes.
 
