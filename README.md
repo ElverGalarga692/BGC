@@ -47,6 +47,8 @@ games/archipelago/
     arch_board.gd        Tablero: terrenos, números, puertos, bandido
     board_generator.gd   Generación aleatoria equilibrada
     archipelago_game.gd  La partida (GameBase): fases, reglas y acciones
+    arch_ai.gd           IA (fácil, normal, difícil)
+    arch_card_tracker.gd Contador de cartas de la IA difícil
   view/                  Escenas y dibujo
     board_view.gd        Vista 2D: tablero, piezas, objetivos y detección
     archipelago_screen.gd  Pantalla de juego: HUD, registro, acciones
@@ -83,6 +85,8 @@ tablero y reutilizar esa misma detección.
 - [x] **Fase 3: reglas completas.** El 7 (descartes y bandido), cartas de
       desarrollo (Miliciano, Monumento, Ingenieros, Cosecha abundante,
       Monopolio), Mayor milicia, Camino más largo y comercio entre jugadores.
-- [ ] **Fase 4: IA.** Jugador aleatorio y luego por heurísticas.
+- [x] **Fase 4: IA.** Tres niveles por jugador (fácil, normal y difícil). La
+      difícil cuenta cartas con información pública y está ajustada con
+      torneos: gana ~43 % de las partidas contra tres IAs normales.
 - [ ] **Fase 5: pulido.** Animaciones, sonido, guardar y cargar, tutorial.
 - [ ] **Siguiente juego** de la colección.

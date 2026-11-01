@@ -17,6 +17,9 @@ const RIGHT_WIDTH := 300.0
 const MARGIN := 12.0
 const RESOURCE_COLORS := ArchBoardView.RESOURCE_COLORS
 const HIGHLIGHT := Color("ffd166")
+## Pausa entre jugadas de la IA (normal / rápida), en segundos.
+const AI_DELAY := 0.6
+const AI_DELAY_FAST := 0.12
 
 ## Qué está construyendo el jugador (espera un clic en el tablero).
 enum Mode { NONE, ROAD, SETTLEMENT, CITY }
@@ -43,6 +46,17 @@ var _players_trade_button: Button
 var _end_button: Button
 var _banner: Label
 var _victory: PanelContainer
+
+var _hand_label: Label
+var _ai_fast_toggle: CheckButton
+## IA de cada jugador controlado por el ordenador (pid -> ArchAI).
+var _ais := {}
+## Evita jugadas duplicadas de la IA y jugadas de una partida anterior.
+var _ai_pending := false
+var _ai_generation := 0
+## Jugador cuya mano se muestra: el humano en turno, o el último humano que
+## jugó mientras juegan las IAs.
+var _viewer := 0
 
 ## Ventana modal abierta (null si no hay) y su identificador.
 var _dialog: Control
@@ -76,6 +90,18 @@ func _start(seed: int) -> void:
 	game.event.connect(_on_game_event)
 	game.game_finished.connect(_on_game_finished)
 	_board_view.game = game
+	_ais.clear()
+	_viewer = -1
+	for p in game.players:
+		if p.is_ai:
+			var ai := ArchAI.new(p.id, p.ai_level, seed)
+			ai.observe(game)
+			_ais[p.id] = ai
+		elif _viewer == -1:
+			_viewer = p.id
+	_viewer = maxi(_viewer, 0)
+	_ai_pending = false
+	_ai_generation += 1
 	_log.clear()
 	_log_label.clear()
 	_mode = Mode.NONE
@@ -137,6 +163,9 @@ func _build_left_panel() -> void:
 	_hover_label.modulate = Color(1, 1, 1, 0.7)
 	_hover_label.custom_minimum_size = Vector2(0, 36)
 	box.add_child(_hover_label)
+	_ai_fast_toggle = CheckButton.new()
+	_ai_fast_toggle.text = "IA rápida"
+	box.add_child(_ai_fast_toggle)
 	box.add_child(_button("Volver al menú", App.go_to_menu))
 
 
@@ -170,6 +199,8 @@ func _build_right_panel() -> void:
 	dice_row.add_child(_dice_label)
 	box.add_child(dice_row)
 
+	_hand_label = _label("", 13)
+	box.add_child(_hand_label)
 	_hand_box = GridContainer.new()
 	_hand_box.columns = 5
 	_hand_box.add_theme_constant_override("h_separation", 4)
@@ -250,6 +281,7 @@ func _build_overlays() -> void:
 	box.add_child(title)
 	var details := _label("", 15)
 	details.name = "Details"
+	details.autowrap_mode = TextServer.AUTOWRAP_OFF
 	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(details)
 	box.add_child(_button("Nueva partida (mismos jugadores)", func() -> void: _start(BGCRng.random_seed())))
@@ -283,27 +315,34 @@ func _layout() -> void:
 func _refresh() -> void:
 	var pid := game.turns.current
 	var player := game.players[pid]
-	var main := game.phase == G.Phase.MAIN and game.trade_offer.is_empty()
+	var human_turn := not player.is_ai
+	var main := game.phase == G.Phase.MAIN and game.trade_offer.is_empty() and human_turn
+	if human_turn or _ais.size() == game.players.size():
+		_viewer = pid
+	var viewer := game.players[_viewer]
 
 	_refresh_players()
 
-	_turn_label.text = player.display_name
+	_turn_label.text = player.display_name + (" (IA)" if player.is_ai else "")
 	_turn_label.add_theme_color_override("font_color", player.color.lightened(0.2))
-	var hidden: int = game.dev_hands[pid][DevCard.MONUMENT]
-	_points_label.text = "%d PV" % game.victory_points(pid) + (" (%d ocultos)" % hidden if hidden > 0 else "")
+	var hidden: int = game.dev_hands[_viewer][DevCard.MONUMENT]
+	_points_label.text = "%d PV" % game.victory_points(_viewer) + (" (%d ocultos)" % hidden if hidden > 0 else "")
+	if _viewer != pid:
+		_points_label.text = "%s: %s" % [viewer.display_name, _points_label.text]
+	_points_label.tooltip_text = "Puntos de %s" % viewer.display_name
 	_prompt_label.text = _prompt_text()
 
-	_roll_button.disabled = game.validate(GameAction.new(G.ROLL, pid)) != ""
+	_roll_button.disabled = not human_turn or game.validate(GameAction.new(G.ROLL, pid)) != ""
 	_dice_label.text = "" if game.last_roll.is_empty() else "%d + %d = %d" % [game.last_roll[0], game.last_roll[1], game.last_roll[0] + game.last_roll[1]]
 
-	for child in _hand_box.get_children():
-		child.queue_free()
+	_hand_label.text = "Mano de %s" % viewer.display_name
+	_clear(_hand_box)
 	for r in G.RESOURCE_COUNT:
-		_hand_box.add_child(_resource_card(r, game.hands[pid][r]))
+		_hand_box.add_child(_resource_card(r, game.hands[_viewer][r]))
 
 	for mode in [Mode.ROAD, Mode.SETTLEMENT, Mode.CITY]:
 		var button: Button = _build_buttons[mode]
-		var error := game.build_error(pid, _mode_action(mode))
+		var error := game.build_error(pid, _mode_action(mode)) if human_turn else "Es el turno de la IA"
 		button.disabled = error != ""
 		button.tooltip_text = error
 		button.set_pressed_no_signal(_mode == mode)
@@ -311,18 +350,18 @@ func _refresh() -> void:
 	_build_buttons["dev"].disabled = buy_error != ""
 	_build_buttons["dev"].tooltip_text = buy_error if buy_error != "" else "Quedan %d cartas en el mazo" % game.dev_deck.size()
 
-	_refresh_dev_cards(pid)
+	_refresh_dev_cards(_viewer, human_turn)
 
 	_bank_button.disabled = not main
 	_players_trade_button.disabled = not main
 	_end_button.disabled = not main
 	_update_targets()
 	_update_state_dialog()
+	_schedule_ai()
 
 
 func _refresh_players() -> void:
-	for child in _players_box.get_children():
-		child.queue_free()
+	_clear(_players_box)
 	for p in game.players:
 		var column := VBoxContainer.new()
 		column.add_theme_constant_override("separation", 0)
@@ -332,7 +371,7 @@ func _refresh_players() -> void:
 		swatch.custom_minimum_size = Vector2(14, 14)
 		swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(swatch)
-		var name_label := _label(p.display_name, 15)
+		var name_label := _label(p.display_name + (" (IA)" if p.is_ai else ""), 15)
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_label.clip_text = true
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -363,9 +402,8 @@ func _refresh_players() -> void:
 		_players_box.add_child(column)
 
 
-func _refresh_dev_cards(pid: int) -> void:
-	for child in _dev_box.get_children():
-		child.queue_free()
+func _refresh_dev_cards(pid: int, can_play: bool) -> void:
+	_clear(_dev_box)
 	var any := false
 	for card in ArchDefs.DEV_NAMES:
 		var count: int = game.dev_hands[pid][card]
@@ -385,7 +423,7 @@ func _refresh_dev_cards(pid: int) -> void:
 		var button := _button("Jugar " + text, _on_play_dev.bind(card), 13)
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var error := game.validate(GameAction.new(G.PLAY_DEV, pid, _dev_probe_data(card)))
-		button.disabled = error != ""
+		button.disabled = error != "" or not can_play
 		button.tooltip_text = ArchDefs.DEV_DESCRIPTIONS[card] + ("\n" + error if error != "" else "")
 		_dev_box.add_child(button)
 	if not any:
@@ -407,6 +445,10 @@ func _dev_probe_data(card: int) -> Dictionary:
 
 func _prompt_text() -> String:
 	var pid := game.turns.current
+	if not game.finished:
+		var actor: int = game.players_to_act()[0]
+		if game.players[actor].is_ai:
+			return "%s (IA) está pensando…" % game.players[actor].display_name
 	if not game.trade_offer.is_empty():
 		return "Esperando respuesta a la oferta…"
 	match game.phase:
@@ -435,7 +477,7 @@ func _prompt_text() -> String:
 
 func _update_targets() -> void:
 	var pid := game.turns.current
-	if _dialog != null or not game.trade_offer.is_empty():
+	if _dialog != null or not game.trade_offer.is_empty() or game.current_player().is_ai:
 		_board_view.set_targets(Pick.NONE, [])
 		return
 	match game.phase:
@@ -541,6 +583,11 @@ func _cancel_dialog() -> void:
 ## Las ventanas que dependen del estado de la partida (descartes y ofertas)
 ## se abren y cierran solas.
 func _update_state_dialog() -> void:
+	var actor: int = game.players_to_act()[0] if not game.finished else -1
+	if actor >= 0 and game.players[actor].is_ai:
+		if _dialog_key.begins_with("state:"):
+			_close_dialog()
+		return
 	if game.phase == G.Phase.DISCARD:
 		var pid: int = game.players_to_act()[0]
 		if not _dialog_key.begins_with("state:discard:%d:" % pid):
@@ -733,6 +780,40 @@ func _open_monopoly_dialog() -> void:
 		box.add_child(_button(ArchDefs.RESOURCE_NAMES[r], func() -> void:
 			_submit(G.PLAY_DEV, {"card": DevCard.MONOPOLY, "resource": r})))
 	box.add_child(_button("Cancelar", _cancel_dialog, 13))
+
+
+# --- IA ---------------------------------------------------------------------------
+
+## Si le toca a una IA, programa su siguiente jugada tras una pausa.
+func _schedule_ai() -> void:
+	if game.finished or _ai_pending or not is_inside_tree():
+		return
+	var actor: int = game.players_to_act()[0]
+	if not _ais.has(actor):
+		return
+	_ai_pending = true
+	var delay := AI_DELAY_FAST if _ai_fast_toggle.button_pressed else AI_DELAY
+	if game.phase == G.Phase.SETUP:
+		delay *= 0.6
+	get_tree().create_timer(delay).timeout.connect(_run_ai.bind(_ai_generation))
+
+
+func _run_ai(generation: int) -> void:
+	if generation != _ai_generation:
+		return  # pertenece a una partida anterior
+	_ai_pending = false
+	if game.finished:
+		return
+	var actor: int = game.players_to_act()[0]
+	if not _ais.has(actor):
+		return
+	var action: GameAction = _ais[actor].choose_action(game)
+	if action == null:
+		push_warning("La IA de %s no encontró ninguna acción" % game.players[actor].display_name)
+		return
+	var error := game.submit(action)
+	if error != "":
+		push_warning("Acción ilegal de la IA: %s (%s)" % [action, error])
 
 
 # --- Interfaz -> acciones -------------------------------------------------------
@@ -932,6 +1013,14 @@ func _show_banner(text: String, color: Color) -> void:
 	_banner.modulate.a = 1.0
 	tween.tween_interval(0.9)
 	tween.tween_property(_banner, "modulate:a", 0.0, 0.5)
+
+
+## Vacía un contenedor al momento (queue_free solo borra al final del
+## fotograma y, si se refresca dos veces seguidas, saldrían duplicados).
+func _clear(container: Node) -> void:
+	for child in container.get_children():
+		container.remove_child(child)
+		child.queue_free()
 
 
 func _add_log(line: String) -> void:

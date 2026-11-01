@@ -12,6 +12,7 @@ var _count_spin: SpinBox
 var _players_list: VBoxContainer
 var _name_edits: Array[LineEdit] = []
 var _color_pickers: Array[ColorPickerButton] = []
+var _ai_options: Array[OptionButton] = []
 
 
 func _ready() -> void:
@@ -25,7 +26,7 @@ func _ready() -> void:
 	add_child(center)
 
 	var column := VBoxContainer.new()
-	column.custom_minimum_size = Vector2(460, 0)
+	column.custom_minimum_size = Vector2(520, 0)
 	column.add_theme_constant_override("separation", 16)
 	center.add_child(column)
 
@@ -101,6 +102,7 @@ func _on_game_chosen(game: Dictionary) -> void:
 	_setup_box.add_child(_players_list)
 	_name_edits.clear()
 	_color_pickers.clear()
+	_ai_options.clear()
 	_rebuild_player_rows()
 
 	var buttons := HBoxContainer.new()
@@ -134,12 +136,21 @@ func _rebuild_player_rows() -> void:
 		edit.max_length = MAX_NAME_LENGTH
 		edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(edit)
+		var ai := OptionButton.new()
+		for level in PlayerInfo.AI_LEVEL_NAMES:
+			ai.add_item(PlayerInfo.AI_LEVEL_NAMES[level], level)
+		# Por defecto: el primer jugador es humano y el resto, IA normal.
+		ai.select(PlayerInfo.AILevel.HUMAN if i == 0 else PlayerInfo.AILevel.NORMAL)
+		ai.custom_minimum_size = Vector2(130, 0)
+		row.add_child(ai)
 		_players_list.add_child(row)
 		_name_edits.append(edit)
 		_color_pickers.append(picker)
+		_ai_options.append(ai)
 	while _name_edits.size() > count:
 		_name_edits.pop_back()
 		_color_pickers.pop_back()
+		_ai_options.pop_back()
 		var row := _players_list.get_child(_players_list.get_child_count() - 1)
 		_players_list.remove_child(row)
 		row.queue_free()
@@ -153,5 +164,9 @@ func _on_back() -> void:
 func _on_play() -> void:
 	var players: Array[PlayerInfo] = []
 	for i in _name_edits.size():
-		players.append(PlayerInfo.new(i, _name_edits[i].text.strip_edges(), _color_pickers[i].color))
+		var level := _ai_options[i].get_selected_id()
+		var player_name := _name_edits[i].text.strip_edges()
+		if player_name == "" and level != PlayerInfo.AILevel.HUMAN:
+			player_name = "IA %d" % (i + 1)
+		players.append(PlayerInfo.new(i, player_name, _color_pickers[i].color, level))
 	App.start_game(_selected_game["id"], players)

@@ -533,6 +533,7 @@ func _apply(action: GameAction) -> void:
 			vertex_owner[v] = pid
 			vertex_building[v] = Building.SETTLEMENT
 			pieces[pid]["settlement"] -= 1
+			data["paid"] = phase != Phase.SETUP
 			if phase == Phase.SETUP:
 				setup_vertex = v
 				if PIECES["settlement"] - pieces[pid]["settlement"] == 2:
@@ -544,6 +545,7 @@ func _apply(action: GameAction) -> void:
 			var e: int = data["edge"]
 			edge_owner[e] = pid
 			pieces[pid]["road"] -= 1
+			data["paid"] = phase == Phase.MAIN
 			match phase:
 				Phase.SETUP:
 					setup_vertex = -1
