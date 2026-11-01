@@ -59,7 +59,8 @@ games/archipelago/
     arch_card_tracker.gd Contador de cartas de la IA difícil
   view/                  Escenas y dibujo
     board_view.gd        Vista 2D: tablero, piezas, objetivos y detección
-    board_view_3d.gd     Vista 3D (mismo contrato), todo generado por código
+    board_view_3d.gd     Vista 3D (mismo contrato), con los modelos de Blender
+  assets/models/         Modelos 3D (.glb) exportados desde Blender
     archipelago_screen.gd  Pantalla de juego: HUD, registro, acciones
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
@@ -71,8 +72,34 @@ pequeño, documentado en `board_view.gd`: la propiedad `game`,
 `set_targets()`, `refresh()`, `fit()` y las señales `hovered` y `clicked`.
 La detección trabaja en "unidades de hexágono" (`ArchBoardView.pick_unit`):
 la vista 3D proyecta el rayo del ratón sobre el plano del tablero y reutiliza
-esa misma función. Las mallas 3D (fichas, decoración, piezas) se generan por
-código; se pueden sustituir más adelante por modelos importados.
+esa misma función. Si falta algún modelo `.glb`, la vista 3D usa una forma
+sencilla generada por código.
+
+### Modelos 3D (Blender)
+
+Los modelos de Archipiélago se crean con un script de Blender, así que se
+pueden regenerar y modificar:
+
+- `art/blender/build_models.py`: construye los modelos y los exporta.
+- `art/blender/archipelago_models.blend`: el resultado, para retocarlo a mano.
+- `games/archipelago/assets/models/*.glb`: lo que carga Godot.
+
+Para regenerarlos, abre el script en la pestaña *Scripting* de Blender y
+pulsa *Run Script*, o desde la terminal:
+
+```bash
+pip install bpy
+python art/blender/build_models.py
+```
+
+Si retocas el `.blend` a mano, exporta cada objeto como `.glb` con el mismo
+nombre. Convenciones que usa la vista 3D:
+- Unidades de hexágono: radio de ficha 0,965 y altura 0,22, con el origen en
+  el centro de la base. El círculo central queda libre para la ficha numérica.
+- Los materiales `player`, `player_dark` y `port_flag` se recolorean en el
+  juego (color del jugador y color del recurso del puerto).
+- La carpeta `art/` lleva un `.gdignore` para que Godot no intente importar
+  el `.blend`.
 
 ### Añadir un juego nuevo
 
@@ -101,6 +128,8 @@ código; se pueden sustituir más adelante por modelos importados.
 - [x] **Vista 3D.** Tablero en 3D con decoración por terreno, piezas que
       caen al colocarse, bandido animado y cámara orbital; se puede volver
       a la vista 2D en cualquier momento.
+- [x] **Modelos de Blender.** Fichas de terreno, piezas, bandido, fichas
+      numéricas y muelles, generados con un script de Blender reproducible.
 - [ ] **Fase 5: pulido.** Más animaciones (dados, recursos), sonido, guardar
       y cargar, tutorial, ajustes.
 - [ ] **Siguiente juego** de la colección.

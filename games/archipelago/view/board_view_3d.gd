@@ -9,6 +9,11 @@ extends SubViewportContainer
 ## tablero igual que la vista 2D.
 ##
 ## Controles: rueda = zoom; botón central o Q/E = girar la cámara.
+##
+## Modelos: se cargan de MODELS_DIR (hechos con Blender, ver
+## art/blender/build_models.py). Si falta alguno, se usa una forma sencilla
+## generada por código. Los materiales "player", "player_dark" y
+## "port_flag" de los modelos se recolorean (color del jugador / recurso).
 
 const Pick := ArchBoardView.Pick
 
@@ -27,6 +32,15 @@ const TOKEN_TEXT := Color("2b2b2b")
 const HOT_TEXT := Color("c0392b")
 const SELECT_COLOR := Color("ffc933")
 const DROP_HEIGHT := 1.6
+const MODELS_DIR := "res://games/archipelago/assets/models/"
+const TERRAIN_MODELS := {
+	ArchDefs.Terrain.DESERT: "tile_desert",
+	ArchDefs.Terrain.FOREST: "tile_forest",
+	ArchDefs.Terrain.HILLS: "tile_hills",
+	ArchDefs.Terrain.PASTURE: "tile_pasture",
+	ArchDefs.Terrain.FIELDS: "tile_fields",
+	ArchDefs.Terrain.MOUNTAINS: "tile_mountains",
+}
 
 var game: ArchipelagoGame:
 	set(value):
@@ -57,6 +71,8 @@ var _zoom := 1.0
 var _dragging := false
 
 var _materials := {}
+## Escenas de modelos ya cargadas (nombre -> PackedScene o null).
+var _scenes := {}
 var _marker_material: StandardMaterial3D
 var _hover_material: StandardMaterial3D
 var _hex_mesh: ArrayMesh
@@ -264,12 +280,18 @@ func _make_tile(t: int) -> Node3D:
 	var center := board.grid.tile_center(t)
 	var tile := Node3D.new()
 	tile.position = Vector3(center.x, 0, center.y)
-	var prism := MeshInstance3D.new()
-	prism.mesh = _hex_mesh
-	# Algo más oscuros que en 2D: la luz 3D los aclara.
-	prism.material_override = _material(ArchDefs.TERRAIN_COLORS[board.tile_terrain[t]].darkened(0.15))
-	tile.add_child(prism)
-	_add_decoration(tile, t)
+	var model := _model(TERRAIN_MODELS[board.tile_terrain[t]])
+	if model != null:
+		# Giros de 60° para que las fichas iguales no se vean idénticas.
+		model.rotation.y = deg_to_rad(60.0 * ((t * 7) % 6))
+		tile.add_child(model)
+	else:
+		var prism := MeshInstance3D.new()
+		prism.mesh = _hex_mesh
+		# Algo más oscuros que en 2D: la luz 3D los aclara.
+		prism.material_override = _material(ArchDefs.TERRAIN_COLORS[board.tile_terrain[t]].darkened(0.15))
+		tile.add_child(prism)
+		_add_decoration(tile, t)
 	var number := board.tile_number[t]
 	if number > 0:
 		tile.add_child(_make_token(number))
@@ -326,7 +348,11 @@ func _add_decoration(tile: Node3D, t: int) -> void:
 func _make_token(number: int) -> Node3D:
 	var token := Node3D.new()
 	token.position.y = TILE_TOP
-	_add_mesh(token, _cylinder(0.3, 0.3, 0.04, 24), TOKEN_COLOR, Vector3(0, 0.02, 0))
+	var disc := _model("token")
+	if disc != null:
+		token.add_child(disc)
+	else:
+		_add_mesh(token, _cylinder(0.3, 0.3, 0.04, 24), TOKEN_COLOR, Vector3(0, 0.02, 0))
 	var hot := number in ArchDefs.HOT_NUMBERS
 	var color := HOT_TEXT if hot else TOKEN_TEXT
 	var label := _flat_label(str(number), 44, color)
@@ -357,11 +383,22 @@ func _make_port(port: Dictionary) -> Node3D:
 		inst.rotation.y = atan2(-(corner.y - pos.y), corner.x - pos.x)
 	var type: int = port["type"]
 	var fill: Color = TOKEN_COLOR if type == ArchDefs.PORT_GENERIC else ArchBoardView.RESOURCE_COLORS[type]
-	_add_mesh(root, _cylinder(0.24, 0.26, 0.1, 20), Color("5b3a1e"), Vector3(pos.x, 0.05, pos.y))
-	_add_mesh(root, _cylinder(0.2, 0.2, 0.02, 20), fill, Vector3(pos.x, 0.11, pos.y))
-	var dark := type == ArchDefs.PORT_GENERIC or type == ArchDefs.ResourceType.GRAIN or type == ArchDefs.ResourceType.WOOL
+	var dock := _model("port")
+	if dock != null:
+		dock.position = Vector3(pos.x, 0, pos.y)
+		dock.rotation.y = atan2(-outward.y, outward.x)
+		_recolor(dock, Color.WHITE, fill)
+		root.add_child(dock)
+		var badge := _model("token")
+		badge.scale = Vector3(0.62, 0.6, 0.62)
+		badge.position = Vector3(pos.x, 0.1, pos.y)
+		root.add_child(badge)
+	else:
+		_add_mesh(root, _cylinder(0.24, 0.26, 0.1, 20), Color("5b3a1e"), Vector3(pos.x, 0.05, pos.y))
+		_add_mesh(root, _cylinder(0.2, 0.2, 0.02, 20), fill, Vector3(pos.x, 0.11, pos.y))
+	var dark := type == ArchDefs.PORT_GENERIC or type == ArchDefs.ResourceType.GRAIN or type == ArchDefs.ResourceType.WOOL or dock != null
 	var label := _flat_label("%d:1" % ArchDefs.port_ratio(type), 30, TOKEN_TEXT if dark else Color.WHITE)
-	label.position = Vector3(pos.x, 0.125, pos.y)
+	label.position = Vector3(pos.x, 0.13 if dock != null else 0.125, pos.y)
 	root.add_child(label)
 	return root
 
@@ -404,12 +441,17 @@ func _make_road(e: int, color: Color) -> Node3D:
 	var a: Vector2 = board.grid.vertex_positions[ev[0]]
 	var b: Vector2 = board.grid.vertex_positions[ev[1]]
 	var mid := (a + b) / 2.0
-	var box := BoxMesh.new()
-	box.size = Vector3(0.64, 0.12, 0.16)
-	var road := MeshInstance3D.new()
-	road.mesh = box
-	road.material_override = _material(color)
-	road.position = Vector3(mid.x, TILE_TOP + 0.06, mid.y)
+	var road: Node3D = _model("road")
+	if road != null:
+		_recolor(road, color)
+		road.position = Vector3(mid.x, TILE_TOP, mid.y)
+	else:
+		var box := BoxMesh.new()
+		box.size = Vector3(0.64, 0.12, 0.16)
+		road = MeshInstance3D.new()
+		road.mesh = box
+		road.material_override = _material(color)
+		road.position = Vector3(mid.x, TILE_TOP + 0.06, mid.y)
 	road.rotation.y = atan2(-(b.y - a.y), b.x - a.x)
 	return road
 
@@ -419,6 +461,11 @@ func _make_building(v: int, building: int, color: Color) -> Node3D:
 	var root := Node3D.new()
 	root.position = Vector3(p.x, TILE_TOP, p.y)
 	root.scale = Vector3.ONE * 1.45
+	var model := _model("city" if building == ArchipelagoGame.Building.CITY else "settlement")
+	if model != null:
+		_recolor(model, color)
+		root.add_child(model)
+		return root
 	var roof_color := color.darkened(0.25)
 	if building == ArchipelagoGame.Building.CITY:
 		_add_box(root, Vector3(0.36, 0.17, 0.22), color, Vector3(0.04, 0.085, 0))
@@ -432,6 +479,10 @@ func _make_building(v: int, building: int, color: Color) -> Node3D:
 
 
 func _sync_bandit() -> void:
+	if _bandit == null:
+		_bandit = _model("bandit")
+		if _bandit != null:
+			_pieces_root.add_child(_bandit)
 	if _bandit == null:
 		_bandit = Node3D.new()
 		var body := CapsuleMesh.new()
@@ -496,6 +547,31 @@ func _make_marker(kind: Pick, id: int, material: Material) -> Node3D:
 
 
 # --- Utilidades de mallas y materiales -----------------------------------------------------
+
+## Instancia un modelo de MODELS_DIR, o null si no existe.
+func _model(model_name: String) -> Node3D:
+	if not _scenes.has(model_name):
+		var path := MODELS_DIR + model_name + ".glb"
+		_scenes[model_name] = load(path) if ResourceLoader.exists(path) else null
+	var scene: PackedScene = _scenes[model_name]
+	return scene.instantiate() as Node3D if scene != null else null
+
+
+## Pinta las partes de color de un modelo: "player" con `color`,
+## "player_dark" con `color` oscurecido y "port_flag" con `flag`.
+func _recolor(node: Node, color: Color, flag: Color = Color.WHITE) -> void:
+	if node is MeshInstance3D and node.mesh != null:
+		for i in node.mesh.get_surface_count():
+			var mat: Material = node.mesh.surface_get_material(i)
+			if mat == null:
+				continue
+			match mat.resource_name:
+				"player_dark": node.set_surface_override_material(i, _material(color.darkened(0.3)))
+				"player": node.set_surface_override_material(i, _material(color))
+				"port_flag": node.set_surface_override_material(i, _material(flag))
+	for child in node.get_children():
+		_recolor(child, color, flag)
+
 
 func _material(color: Color) -> StandardMaterial3D:
 	var key := color.to_html()

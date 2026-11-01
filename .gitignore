@@ -5,3 +5,6 @@
 export_presets.cfg
 export_credentials.cfg
 *.tmp
+
+# Copias de seguridad de Blender
+*.blend1
