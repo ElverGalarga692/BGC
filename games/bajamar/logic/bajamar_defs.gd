@@ -30,7 +30,7 @@ const MIN_VALUE := 1
 const MAX_VALUE := 6
 ## Copias de cada pez (especie y valor) en el mazo.
 const FISH_COPIES := 2
-const STORM_COUNT := 8
+const STORM_COUNT := 10
 
 const STORM := 100
 ## Gaviota: robas el último pez de la red de otro jugador.
@@ -51,6 +51,8 @@ const TARGET_SCORE := 150
 ## RUN_POINTS por cada carta a partir de la tercera (1-2-3 = 5, 1-2-3-4 = 10).
 const RUN_MIN := 3
 const RUN_POINTS := 5
+## Extra por cada carta de la especie con más cartas.
+const SPECIES_BONUS_PER_CARD := 2
 
 
 static func fish(species: int, value: int) -> int:
@@ -109,13 +111,13 @@ static func deck() -> Array[int]:
 
 ## Puntuación de una red que vuelve a puerto. Devuelve el desglose:
 ##   base           suma de los valores de los peces
-##   best_species   especie que vale doble (-1 si no hay peces)
-##   species_bonus  puntos extra por esa especie (la suma de sus valores)
+##   best_species   especie con más cartas (-1 si no hay peces)
+##   species_bonus  SPECIES_BONUS_PER_CARD por cada carta de esa especie
 ##   runs           escaleras que puntúan, cada una [desde, hasta]
 ##   run_bonus      puntos de las escaleras
 ##   total
 ##
-## Vale doble la especie con más cartas; si empatan, la que más suma y, si
+## Da extra la especie con más cartas; si empatan, la que más suma y, si
 ## siguen empatadas, la primera en el orden de Species.
 static func score(net: Array) -> Dictionary:
 	var base := 0
@@ -139,7 +141,7 @@ static func score(net: Array) -> Dictionary:
 			continue
 		if best == -1 or counts[s] > counts[best] or (counts[s] == counts[best] and sums[s] > sums[best]):
 			best = s
-	var species_bonus := sums[best] if best >= 0 else 0
+	var species_bonus := SPECIES_BONUS_PER_CARD * counts[best] if best >= 0 else 0
 	var runs: Array = []
 	var run_bonus := 0
 	var v := MIN_VALUE

@@ -42,15 +42,15 @@ func test_score_empty_net() -> void:
 	assert_eq(s["best_species"], -1)
 
 
-func test_score_doubles_most_common_species() -> void:
-	# Dos sardinas (2 + 5) y un atún 6: la sardina vale doble.
+func test_score_bonus_for_most_common_species() -> void:
+	# Dos sardinas (2 + 5) y un atún 6: la sardina da +2 por carta.
 	var net := [D.fish(D.Species.SARDINE, 2), D.fish(D.Species.SARDINE, 5), D.fish(D.Species.TUNA, 6)]
 	var s := D.score(net)
 	assert_eq(s["base"], 13)
 	assert_eq(s["best_species"], D.Species.SARDINE)
-	assert_eq(s["species_bonus"], 7)
+	assert_eq(s["species_bonus"], 2 * D.SPECIES_BONUS_PER_CARD)
 	assert_eq(s["run_bonus"], 0, "5 y 6 son solo dos seguidos")
-	assert_eq(s["total"], 20)
+	assert_eq(s["total"], 13 + 2 * D.SPECIES_BONUS_PER_CARD)
 
 
 func test_score_species_tie_breaks_by_sum_then_order() -> void:
@@ -79,10 +79,10 @@ func test_score_runs() -> void:
 
 
 func test_score_full_example() -> void:
-	# Pulpo 1, 2, 4 + Atún 3 → base 10, pulpo doble +7, escalera 1-4 +10.
+	# Pulpo 1, 2, 4 + Atún 3 → suma 10, tres pulpos +6, escalera 1-4 +10.
 	var net := [D.fish(2, 1), D.fish(2, 2), D.fish(2, 4), D.fish(4, 3)]
 	var s := D.score(net)
 	assert_eq(s["base"], 10)
-	assert_eq(s["species_bonus"], 7)
+	assert_eq(s["species_bonus"], 6)
 	assert_eq(s["run_bonus"], 10)
-	assert_eq(s["total"], 27)
+	assert_eq(s["total"], 26)

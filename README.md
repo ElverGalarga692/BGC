@@ -125,6 +125,8 @@ games/bajamar/           Bajamar (en desarrollo: aún no está en el menú)
     bajamar_defs.gd      Cartas (enteros), mazo y puntuación de una red
     bajamar_game.gd      La partida (GameBase): rondas, mercado, tormentas,
                          especiales, volver a puerto, puntos y fin de partida
+    bajamar_ai.gd        IA (fácil, normal y difícil); cuenta cartas solo con
+                         lo que está a la vista
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -287,9 +289,18 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       turno espera), Red reforzada (salva de la tormenta que rompería la red)
       y Marea alta (todos los que siguen en el mar roban; sin cadenas). Mazo
       de 76 cartas.
-- [ ] **Bajamar, fase 3: IA.** Fácil (umbral fijo), normal (valor esperado
-      con el riesgo de tormenta) y difícil (mercado, escaleras, marcador y
-      Gaviota); ajustada con torneos.
+- [x] **Bajamar, fase 3: IA y equilibrio.** Fácil (pesca hasta un umbral),
+      normal (cuenta cartas y compara plantarse con el valor esperado de
+      robar) y difícil (mira dos robos por delante, valora el daño de la
+      Gaviota y juega para ganar en la última ronda). Las simulaciones
+      cambiaron las reglas: una tormenta ya rompe la red (con aviso previo
+      se pescaba sin riesgo y salían rondas de 200 puntos), coger del
+      mercado lleva a puerto (si no, era una fuente de peces sin riesgo), la
+      Red reforzada salva la mitad de los puntos en vez de una tormenta, la
+      especie mayoritaria da +2 por carta en vez de valer doble, 10
+      tormentas y los descartes se barajan al empezar cada ronda. Con IAs
+      normales una partida a 4 dura ~7 rondas (~16 puntos por ronda, máximo
+      ~80); la normal gana ~57 % contra tres fáciles.
 - [ ] **Bajamar, fase 4: pantalla.** Mesa 2D con redes, mercado y mazo,
       volteo de cartas y sonidos; el juego aparece en el menú.
 - [ ] **Bajamar, fase 5: red local y pulido.** Resumen de cada ronda,

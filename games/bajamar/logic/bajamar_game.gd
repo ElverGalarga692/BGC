@@ -5,14 +5,14 @@ extends GameBase
 ## La partida se juega en rondas. En cada ronda todos salen a pescar y, por
 ## turnos, cada jugador que sigue en el mar hace una de estas tres cosas:
 ##   DRAW_BLIND    robar la carta de arriba del mazo (a ciegas);
-##   TAKE_MARKET   coger una de las cartas boca arriba del mercado;
+##   TAKE_MARKET   coger una de las cartas boca arriba del mercado y volver
+##                 a puerto con ella (es la última captura, sin riesgo);
 ##   GO_TO_PORT    volver a puerto: guarda su red y deja de jugar la ronda.
 ##
-## La primera tormenta que recibe un jugador es un aviso (se queda delante
-## de él). Con la segunda se le rompe la red: pierde lo pescado y no puntúa
-## la ronda. En el mercado nunca hay tormentas: si al reponerlo sale una,
-## pasa de largo (va a los descartes, a la vista de todos) y se repone otra
-## vez.
+## Si a un jugador le sale una tormenta, se le rompe la red: pierde lo
+## pescado y no puntúa la ronda. En el mercado nunca hay tormentas: si al
+## reponerlo sale una, pasa de largo (va a los descartes, a la vista de todos)
+## y se repone otra vez.
 ##
 ## Cartas especiales (pueden salir del mazo o cogerse del mercado):
 ##   Gaviota        quien la recibe elige a otro jugador con peces en la red
@@ -20,8 +20,8 @@ extends GameBase
 ##                  último pez que pescó (CHOOSE_TARGET). Si nadie tiene
 ##                  peces, se descarta sin efecto.
 ##   Red reforzada  se queda delante del jugador (como mucho una; otra más se
-##                  descarta) y le salva de la tormenta que le rompería la
-##                  red: las dos cartas se descartan y el aviso sigue.
+##                  descarta). Si se le rompe la red, puntúa la mitad de lo
+##                  que llevaba (redondeando hacia abajo) en vez de 0.
 ##   Marea alta     todos los que siguen en el mar roban una carta a ciegas,
 ##                  empezando por quien la recibió y en orden de turno. Las
 ##                  tormentas cuentan; otra Marea alta robada así no tiene
@@ -29,6 +29,8 @@ extends GameBase
 ##                  mismo orden.
 ## Mientras haya gaviotas por resolver, solo puede actuar quien la tiene, y
 ## el turno no pasa hasta que se resuelven todas.
+##
+## Al empezar cada ronda, los descartes se barajan con el mazo.
 ##
 ## La ronda termina cuando ya nadie está en el mar. Cada red que volvió a
 ## puerto puntúa (BajamarDefs.score). Si alguien llega a TARGET_SCORE, gana
@@ -65,18 +67,19 @@ var discard: Array[int] = []
 ## Cartas boca arriba del mercado (hasta MARKET_SIZE).
 var market: Array[int] = []
 
-## Por jugador: cartas de su red esta ronda, si tiene una tormenta de aviso,
-## si tiene una red reforzada, su situación y su puntuación total.
+## Por jugador: cartas de su red esta ronda, si tiene una red reforzada, su
+## situación y su puntuación total.
 var nets: Array = []
-var warnings: Array[bool] = []
 var shields: Array[bool] = []
+## Por jugador: puntos salvados por la red reforzada al rompérsele la red.
+var salvaged: Array[int] = []
 var status: Array[int] = []
 var scores: Array[int] = []
 ## Jugadores con una gaviota por resolver, en orden (la carta ya está en los
 ## descartes).
 var pending_gulls: Array[int] = []
 ## Puntos de la última ronda terminada, por jugador (desglose de
-## BajamarDefs.score, o {"total": 0, "broken": true}).
+## BajamarDefs.score, o {"total": puntos salvados, "broken": true}).
 var last_round: Array = []
 
 
@@ -91,8 +94,8 @@ func _on_setup() -> void:
 	nets.clear()
 	for p in players.size():
 		nets.append([] as Array[int])
-	warnings.assign(_filled(players.size(), false))
 	shields.assign(_filled(players.size(), false))
+	salvaged.assign(_filled(players.size(), 0))
 	status.assign(_filled(players.size(), Status.AT_SEA))
 	scores.assign(_filled(players.size(), 0))
 	pending_gulls.clear()
@@ -141,14 +144,10 @@ func cards_left() -> int:
 	return deck.size() + discard.size()
 
 
-## Tormentas que quedan en el mazo. Se deduce de lo que está a la vista (los
-## avisos y los descartes), así que cualquier jugador puede calcularlo.
+## Tormentas que quedan en el mazo. Las demás están en los descartes, a la
+## vista, así que cualquier jugador puede calcularlo.
 func storms_in_deck() -> int:
-	var seen := discard.count(D.STORM)
-	for p in players.size():
-		if warnings[p]:
-			seen += 1
-	return D.STORM_COUNT - seen
+	return D.STORM_COUNT - discard.count(D.STORM)
 
 
 ## Probabilidad de que robar a ciegas dé una tormenta (si el mazo está vacío,
@@ -203,8 +202,11 @@ func _apply(action: GameAction) -> void:
 			var slot := int(action.data["slot"])
 			var card: int = market[slot]
 			market.remove_at(slot)
+			# Primero vuelve a puerto: una Marea alta del mercado ya no le toca.
+			status[pid] = Status.IN_PORT
 			_receive(pid, card, "market")
 			_refill_market()
+			event.emit(&"port", {"player": pid, "score": net_score(pid)})
 		GO_TO_PORT:
 			status[pid] = Status.IN_PORT
 			event.emit(&"port", {"player": pid, "score": net_score(pid)})
@@ -262,25 +264,18 @@ func _receive(pid: int, card: int, from: String, tide: bool = false) -> void:
 			_high_tide(pid)
 
 
+## Se rompe la red. Con red reforzada salva la mitad de los puntos.
 func _storm(pid: int) -> void:
-	if not warnings[pid]:
-		warnings[pid] = true
-		event.emit(&"warning", {"player": pid})
-		return
+	salvaged[pid] = 0
 	if shields[pid]:
+		salvaged[pid] = int(D.score(nets[pid])["total"]) / 2
 		shields[pid] = false
 		discard.append(D.SHIELD)
-		discard.append(D.STORM)
-		event.emit(&"shield_used", {"player": pid})
-		return
-	# Segunda tormenta: se rompe la red.
 	status[pid] = Status.BROKEN
 	discard.append_array(nets[pid])
-	discard.append(D.STORM)  # la de aviso
 	discard.append(D.STORM)
 	nets[pid] = [] as Array[int]
-	warnings[pid] = false
-	event.emit(&"net_broken", {"player": pid})
+	event.emit(&"net_broken", {"player": pid, "salvaged": salvaged[pid]})
 
 
 ## Marea alta: cada jugador que sigue en el mar roba una carta, empezando
@@ -317,9 +312,10 @@ func _draw() -> int:
 	return deck.pop_back()
 
 
-## Repone el mercado. Las tormentas que salen pasan de largo.
+## Repone el mercado. Las tormentas que salen pasan de largo. Si solo quedan
+## tormentas (en el mazo y en los descartes), el mercado se queda incompleto.
 func _refill_market() -> void:
-	while market.size() < D.MARKET_SIZE and cards_left() > 0:
+	while market.size() < D.MARKET_SIZE and cards_left() > D.STORM_COUNT:
 		var card := _draw()
 		if D.is_storm(card):
 			discard.append(card)
@@ -344,9 +340,14 @@ func _start_round() -> void:
 	var n := players.size()
 	for p in n:
 		nets[p] = [] as Array[int]
-		warnings[p] = false
 		shields[p] = false
+		salvaged[p] = 0
 		status[p] = Status.AT_SEA
+	# Cada ronda empieza con todo el riesgo: los descartes vuelven al mazo.
+	if not discard.is_empty():
+		deck.append_array(discard)
+		discard.clear()
+		rng.shuffle(deck)
 	_refill_market()
 	turns.current = (start_player + round_number - 1) % n
 	event.emit(&"round_start", {"round": round_number, "first": turns.current})
@@ -359,16 +360,13 @@ func _end_round() -> void:
 		if status[p] == Status.IN_PORT:
 			result = D.score(nets[p])
 		else:
-			result = {"total": 0, "broken": true}
+			result = {"total": salvaged[p], "broken": true}
 		scores[p] += int(result["total"])
 		last_round.append(result)
 		discard.append_array(nets[p])
-		if warnings[p]:
-			discard.append(D.STORM)
 		if shields[p]:
 			discard.append(D.SHIELD)
 		nets[p] = [] as Array[int]
-		warnings[p] = false
 		shields[p] = false
 	event.emit(&"round_end", {"round": round_number, "results": last_round.duplicate(true)})
 	var best: int = scores.max()

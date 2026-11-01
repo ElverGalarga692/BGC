@@ -14,12 +14,22 @@ func _game(n: int = 3, seed_value: int = 1) -> BajamarGame:
 
 
 ## Prepara el mazo para que se roben `cards` en ese orden (el resto debajo).
+## Si una carta está en el mercado, se cambia allí por un pez del mazo, para
+## no duplicarla.
 func _rig(g: BajamarGame, cards: Array) -> void:
 	var rest := g.deck.duplicate()
 	for c in cards:
 		var i := rest.find(c)
 		if i >= 0:
 			rest.remove_at(i)
+			continue
+		var slot := g.market.find(c)
+		if slot >= 0:
+			for k in rest.size():
+				if D.is_fish(rest[k]) and not rest[k] in cards:
+					g.market[slot] = rest[k]
+					rest.remove_at(k)
+					break
 	var top := cards.duplicate()
 	top.reverse()
 	g.deck.assign(rest + top)
@@ -34,7 +44,7 @@ func _do(g: BajamarGame, type: StringName, data: Dictionary = {}, pid: int = -1)
 func _total_cards(g: BajamarGame) -> int:
 	var total := g.deck.size() + g.discard.size() + g.market.size()
 	for p in g.players.size():
-		total += g.net(p).size() + (1 if g.warnings[p] else 0) + (1 if g.shields[p] else 0)
+		total += g.net(p).size() + (1 if g.shields[p] else 0)
 	return total
 
 
@@ -105,33 +115,44 @@ func test_gull_from_market() -> void:
 	_rig(g, [a])
 	_do(g, G.DRAW_BLIND)  # J0: pez
 	g.market[0] = D.GULL
-	_do(g, G.TAKE_MARKET, {"slot": 0})  # J1
-	assert_eq(g.players_to_act(), [1] as Array[int])
+	_do(g, G.TAKE_MARKET, {"slot": 0})  # J1: gaviota y a puerto
+	assert_eq(g.status[1], G.Status.IN_PORT)
+	assert_eq(g.players_to_act(), [1] as Array[int], "resuelve la gaviota aunque ya esté en puerto")
 	_do(g, G.CHOOSE_TARGET, {"target": 0})
 	assert_eq(g.net(1), [a] as Array[int])
 	assert_eq(g.market.size(), D.MARKET_SIZE)
+	assert_eq(g.turns.current, 0)
 
 
 # --- Red reforzada ------------------------------------------------------------------
 
-func test_shield_saves_net_from_second_storm() -> void:
+func test_shield_salvages_half_when_net_breaks() -> void:
 	var g := _game(2)
-	var f := D.fish(1, 3)
-	_rig(g, [D.SHIELD, D.fish(0, 1), D.STORM, D.fish(0, 2), D.STORM, D.fish(0, 3), f])
+	var fish := [D.fish(1, 3), D.fish(1, 4)]  # 7 + 2 caballas × 2 = 11
+	_rig(g, [D.SHIELD, D.fish(0, 1), fish[0], D.fish(0, 2), fish[1], D.STORM])
 	_do(g, G.DRAW_BLIND)  # J0: red reforzada
 	assert_true(g.shields[0])
-	_do(g, G.DRAW_BLIND)  # J1
-	_do(g, G.DRAW_BLIND)  # J0: aviso (la red reforzada no se gasta)
-	assert_true(g.warnings[0] and g.shields[0])
-	_do(g, G.DRAW_BLIND)  # J1
-	_do(g, G.DRAW_BLIND)  # J0: segunda tormenta → la para la red reforzada
-	assert_eq(g.status[0], G.Status.AT_SEA)
-	assert_false(g.shields[0])
-	assert_true(g.warnings[0], "el aviso sigue")
-	_do(g, G.DRAW_BLIND)  # J1
-	_do(g, G.DRAW_BLIND)  # J0: pez
-	assert_eq(g.net(0), [f] as Array[int])
-	assert_eq(_total_cards(g), D.deck().size())
+	for i in 4:
+		_do(g, G.DRAW_BLIND)
+	_do(g, G.GO_TO_PORT)  # J1
+	assert_eq(g.net_score(0)["total"], 11)
+	var log := []
+	g.event.connect(func(kind: StringName, d: Dictionary) -> void:
+		if kind == &"net_broken":
+			log.append(d["salvaged"]))
+	_do(g, G.DRAW_BLIND)  # J0: tormenta → se rompe, salva la mitad
+	assert_eq(log, [5])
+	assert_eq(g.last_round[0]["total"], 5)
+	assert_true(g.last_round[0]["broken"])
+	assert_eq(g.scores[0], 5)
+
+
+func test_shield_from_market_is_useless() -> void:
+	var g := _game(2)
+	g.market[0] = D.SHIELD
+	_do(g, G.TAKE_MARKET, {"slot": 0})
+	assert_eq(g.status[0], G.Status.IN_PORT)
+	assert_true(g.shields[0], "la tiene, pero ya está en puerto")
 
 
 func test_second_shield_is_discarded() -> void:
@@ -177,14 +198,25 @@ func test_high_tide_everyone_at_sea_draws() -> void:
 
 func test_high_tide_storm_can_break_others() -> void:
 	var g := _game(2)
-	_rig(g, [D.STORM, D.fish(0, 1), D.fish(0, 2), D.HIGH_TIDE, D.fish(0, 3), D.STORM])
-	_do(g, G.DRAW_BLIND)  # J0: aviso
-	_do(g, G.DRAW_BLIND)  # J1: pez
+	_rig(g, [D.fish(0, 1), D.HIGH_TIDE, D.fish(0, 3), D.STORM])
 	_do(g, G.DRAW_BLIND)  # J0: pez
 	_do(g, G.DRAW_BLIND)  # J1: marea → J1 pez, J0 tormenta (se rompe)
 	assert_eq(g.status[0], G.Status.BROKEN)
 	assert_eq(g.status[1], G.Status.AT_SEA)
 	assert_eq(g.turns.current, 1, "J0 ya no está en el mar")
+
+
+func test_high_tide_from_market_skips_taker() -> void:
+	var g := _game(3)
+	var a := D.fish(0, 1)
+	var b := D.fish(1, 2)
+	_rig(g, [a, b])
+	g.market[0] = D.HIGH_TIDE
+	_do(g, G.TAKE_MARKET, {"slot": 0})  # J0 a puerto; roban J1 y J2
+	assert_true(g.net(0).is_empty())
+	assert_eq(g.net(1), [a] as Array[int])
+	assert_eq(g.net(2), [b] as Array[int])
+	assert_eq(g.turns.current, 1)
 
 
 func test_high_tide_chain_is_wasted_and_gulls_resolve_after() -> void:
@@ -206,9 +238,7 @@ func test_high_tide_chain_is_wasted_and_gulls_resolve_after() -> void:
 
 func test_gull_wasted_when_only_target_breaks_in_tide() -> void:
 	var g := _game(2)
-	_rig(g, [D.STORM, D.fish(0, 1), D.fish(0, 2), D.HIGH_TIDE, D.GULL, D.STORM])
-	_do(g, G.DRAW_BLIND)  # J0: aviso
-	_do(g, G.DRAW_BLIND)  # J1: pez
+	_rig(g, [D.fish(0, 1), D.HIGH_TIDE, D.GULL, D.STORM])
 	_do(g, G.DRAW_BLIND)  # J0: pez
 	var log := _events(g)
 	_do(g, G.DRAW_BLIND)  # J1: marea → J1 gaviota, J0 tormenta (se rompe)
