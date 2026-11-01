@@ -119,6 +119,12 @@ games/conjura/
     vote_reveal.gd       Revelación animada de cada votación
     conjura_screen.gd    Pantalla: jugadores, registro, acciones y ventana
                          privada con cortina de «Pasa el dispositivo»
+games/bajamar/           Bajamar (en desarrollo: aún no está en el menú)
+  rules.txt              Reglas del juego
+  logic/
+    bajamar_defs.gd      Cartas (enteros), mazo y puntuación de una red
+    bajamar_game.gd      La partida (GameBase): rondas, mercado, tormentas,
+                         volver a puerto, puntos y fin de partida
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -270,7 +276,21 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       sonidos propios (sello, gong, redoble, susurro, victorias) y pantalla
       final con las cartas de rol y el historial de gobiernos, que compara
       lo que dijo cada uno con lo que pasó de verdad y marca las mentiras.
-- [ ] **Siguiente juego** de la colección.
+- [x] **Bajamar, fases 0 y 1.** Juego original de cartas de arriesgar o
+      plantarse (2 a 6 jugadores): robar a ciegas o del mercado, volver a
+      puerto, tormentas (la primera avisa, la segunda rompe la red),
+      puntuación con especie doble y escaleras, rondas hasta 150 puntos;
+      mazo que se rebaraja y riesgo calculable con información pública
+      (`storm_chance()`). Tests de reglas, determinismo y guardado.
+- [ ] **Bajamar, fase 2: especiales.** Gaviota (robar el último pez de otro
+      jugador), Red reforzada (anula una tormenta) y Marea alta (todos roban).
+- [ ] **Bajamar, fase 3: IA.** Fácil (umbral fijo), normal (valor esperado
+      con el riesgo de tormenta) y difícil (mercado, escaleras, marcador y
+      Gaviota); ajustada con torneos.
+- [ ] **Bajamar, fase 4: pantalla.** Mesa 2D con redes, mercado y mazo,
+      volteo de cartas y sonidos; el juego aparece en el menú.
+- [ ] **Bajamar, fase 5: red local y pulido.** Resumen de cada ronda,
+      animaciones y ajustes.
 
 ### Opciones de cada juego
 

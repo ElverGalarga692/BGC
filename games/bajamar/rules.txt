@@ -1,0 +1,35 @@
+[font_size=26][b]Bajamar[/b][/font_size]
+Sales a pescar con tu barca. Cuanto más tiempo te quedes en el mar, más peces puedes meter en la red... pero si te pillan dos tormentas, se rompe y lo pierdes todo. [b]Gana quien tenga más puntos cuando alguien llegue a 150 al final de una ronda.[/b]
+
+[font_size=20][b]Las cartas[/b][/font_size]
+• [b]Peces:[/b] cinco especies (Sardina, Caballa, Pulpo, Merluza y Atún) con valores del 1 al 6. Hay dos cartas de cada.
+• [b]Tormentas:[/b] hay 8.
+
+[font_size=20][b]El mercado[/b][/font_size]
+En el centro hay siempre [b]3 cartas boca arriba[/b]. Cuando alguien coge una, se repone con la de arriba del mazo. [b]En el mercado nunca hay tormentas:[/b] si al reponerlo sale una, pasa de largo (va a los descartes, a la vista de todos) y se saca otra carta.
+
+[font_size=20][b]Una ronda[/b][/font_size]
+Todos empiezan en el mar con la red vacía. Por turnos, cada jugador que sigue en el mar hace [b]una[/b] de estas tres cosas:
+1. [b]Robar a ciegas[/b] la carta de arriba del mazo.
+2. [b]Coger una carta del mercado.[/b]
+3. [b]Volver a puerto:[/b] te quedas con lo que llevas y no juegas más esta ronda.
+
+[font_size=20][b]Las tormentas[/b][/font_size]
+• La [b]primera[/b] tormenta que te sale es un aviso: se queda delante de ti y sigues jugando.
+• Con la [b]segunda[/b] se te rompe la red: pierdes todo lo pescado y esta ronda no puntúas.
+
+[font_size=20][b]Fin de la ronda y puntos[/b][/font_size]
+La ronda termina cuando ya no queda nadie en el mar. Cada red que volvió a puerto puntúa:
+• La [b]suma[/b] de los valores de sus peces.
+• La especie de la que tengas [b]más cartas vale doble[/b] (solo una; si empatan, la que más suma).
+• [b]Escaleras:[/b] si tienes tres o más valores seguidos (de cualquier especie), ganas [b]5 puntos por cada carta a partir de la tercera[/b]: 1-2-3 da 5, 1-2-3-4 da 10 y la escalera completa del 1 al 6 da 20. Los valores repetidos solo cuentan una vez.
+
+[i]Ejemplo:[/i] Pulpo 1, Pulpo 2, Pulpo 4 y Atún 3 → 10 de suma + 7 porque el pulpo vale doble + 10 por la escalera 1-2-3-4 = [b]27 puntos[/b].
+
+Después, todas las cartas de las redes van a los descartes, el mercado se queda como está y empieza la ronda siguiente el jugador de la izquierda del que empezó.
+
+[font_size=20][b]El mazo[/b][/font_size]
+Cuando se acaba, se barajan los descartes y forman un mazo nuevo. Como todo lo demás está a la vista, puedes contar cuántas tormentas quedan por salir.
+
+[font_size=20][b]Final[/b][/font_size]
+Al terminar una ronda, si alguien tiene [b]150 puntos o más[/b], acaba la partida. Gana quien más puntos tenga; si empatan, comparten la victoria.
