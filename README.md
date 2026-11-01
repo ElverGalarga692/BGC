@@ -119,6 +119,20 @@ games/conjura/
     vote_reveal.gd       Revelación animada de cada votación
     conjura_screen.gd    Pantalla: jugadores, registro, acciones y ventana
                          privada con cortina de «Pasa el dispositivo»
+games/bajamar/           Bajamar
+  rules.txt              Reglas del juego
+  logic/
+    bajamar_defs.gd      Cartas (enteros), mazo y puntuación de una red
+    bajamar_game.gd      La partida (GameBase): rondas, mercado, tormentas,
+                         especiales, volver a puerto, puntos y fin de partida
+    bajamar_ai.gd        IA (fácil, normal y difícil); cuenta cartas solo con
+                         lo que está a la vista
+  view/
+    bajamar_art.gd       Cartas dibujadas por código (peces, tormenta,
+                         especiales, reverso) y BajamarCard con volteo
+    bajamar_screen.gd    Pantalla: marcador, mesa (mazo, mercado, descartes),
+                         barcas con sus redes, acciones con los puntos de
+                         cada opción, resumen de ronda y pantalla final
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -208,7 +222,8 @@ archivos de audio. Para sustituir uno por una grabación, pon un `.wav` u
 `.ogg` con su nombre en `res://assets/sfx/` (por ejemplo `dice.wav`).
 Nombres: `dice`, `build`, `resource`, `card`, `robber`, `turn`, `trade`,
 `win`, `error`, `click`, y los de La Conjura: `approve`, `reject`, `seal`,
-`gong`, `whisper`, `crisis`, `win_sombra`.
+`gong`, `whisper`, `crisis`, `win_sombra`, y los de Bajamar: `thunder`,
+`gull` y `wave`.
 
 ### Partidas guardadas
 
@@ -270,7 +285,47 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       sonidos propios (sello, gong, redoble, susurro, victorias) y pantalla
       final con las cartas de rol y el historial de gobiernos, que compara
       lo que dijo cada uno con lo que pasó de verdad y marca las mentiras.
-- [ ] **Siguiente juego** de la colección.
+- [x] **Bajamar, fases 0 y 1.** Juego original de cartas de arriesgar o
+      plantarse (2 a 6 jugadores): robar a ciegas o del mercado, volver a
+      puerto, tormentas (la primera avisa, la segunda rompe la red),
+      puntuación con especie doble y escaleras, rondas hasta 150 puntos;
+      mazo que se rebaraja y riesgo calculable con información pública
+      (`storm_chance()`). Tests de reglas, determinismo y guardado.
+- [x] **Bajamar, fase 2: especiales.** Gaviota (quita el último pez a otro
+      jugador, también en puerto; se elige víctima con `choose_target` y el
+      turno espera), Red reforzada (salva de la tormenta que rompería la red)
+      y Marea alta (todos los que siguen en el mar roban; sin cadenas). Mazo
+      de 76 cartas.
+- [x] **Bajamar, fase 3: IA y equilibrio.** Fácil (pesca hasta un umbral),
+      normal (cuenta cartas y compara plantarse con el valor esperado de
+      robar) y difícil (mira dos robos por delante, valora el daño de la
+      Gaviota y juega para ganar en la última ronda). Las simulaciones
+      cambiaron las reglas: una tormenta ya rompe la red (con aviso previo
+      se pescaba sin riesgo y salían rondas de 200 puntos), coger del
+      mercado lleva a puerto (si no, era una fuente de peces sin riesgo), la
+      Red reforzada salva la mitad de los puntos en vez de una tormenta, la
+      especie mayoritaria da +2 por carta en vez de valer doble, 10
+      tormentas y los descartes se barajan al empezar cada ronda. Con IAs
+      normales una partida a 4 dura ~7 rondas (~16 puntos por ronda, máximo
+      ~80); la normal gana ~57 % contra tres fáciles. Pendiente: la difícil
+      todavía empata con la normal (49 % en 500 duelos), porque maximizar
+      los puntos esperados de cada ronda ya es casi lo mejor que se puede
+      hacer; solo gana algo en la última ronda.
+- [x] **Bajamar, fase 4: pantalla.** Mesa 2D con el mazo (y el riesgo de
+      tormenta), el mercado (se puede pulsar una carta para cogerla) y los
+      descartes; una barca por jugador con su red; botones con los puntos que
+      daría cada opción y desglose de la red; elección de víctima de la
+      Gaviota; cartas que se voltean al aparecer, barcas que se tiñen de rojo
+      al romperse la red, rótulos y sonidos; resumen al final de cada ronda
+      (se cierra solo si solo juegan IAs) y pantalla final. Atajos: R, P y
+      1-3. El juego ya aparece en el menú, con guardado automático.
+- [x] **Bajamar, fase 5: red local y pulido.** Probado en red con un
+      anfitrión y dos clientes (hasta 5 plazas con IAs): todos terminan con
+      el mismo historial, y si un cliente se desconecta una IA ocupa su plaza
+      y la partida sigue. En red, el resumen de ronda se cierra solo para que
+      nadie bloquee. El resumen y la pantalla final enseñan las cartas de
+      cada red (las rotas, oscurecidas), el riesgo de tormenta cambia de
+      color y hay sonidos propios (trueno, gaviota y ola).
 
 ### Opciones de cada juego
 

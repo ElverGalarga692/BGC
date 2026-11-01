@@ -39,6 +39,17 @@ static func all_games() -> Array[Dictionary]:
 			# Colores del emblema de la tarjeta del menú.
 			"colors": [Color("4f8fd6"), Color("b8404f"), Color("c9a96e"), Color("3a2d4a"), Color("e3b34c"), Color("7a2f3b")],
 		},
+		{
+			"id": "bajamar",
+			"name": "Bajamar",
+			"description": "Pesca a tu suerte: sigue robando cartas para llenar la red o vuelve a puerto antes de que llegue la tormenta.",
+			"scene": "res://games/bajamar/bajamar.tscn",
+			"rules": "res://games/bajamar/rules.txt",
+			"min_players": 2,
+			"max_players": 6,
+			# Colores del emblema de la tarjeta del menú (las especies).
+			"colors": [Color("9fb8c8"), Color("3f8f8a"), Color("c4566b"), Color("d9c48c"), Color("3f5fa8"), Color("1f5f86")],
+		},
 	]
 
 
