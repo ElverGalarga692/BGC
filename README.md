@@ -222,7 +222,8 @@ archivos de audio. Para sustituir uno por una grabación, pon un `.wav` u
 `.ogg` con su nombre en `res://assets/sfx/` (por ejemplo `dice.wav`).
 Nombres: `dice`, `build`, `resource`, `card`, `robber`, `turn`, `trade`,
 `win`, `error`, `click`, y los de La Conjura: `approve`, `reject`, `seal`,
-`gong`, `whisper`, `crisis`, `win_sombra`.
+`gong`, `whisper`, `crisis`, `win_sombra`, y los de Bajamar: `thunder`,
+`gull` y `wave`.
 
 ### Partidas guardadas
 
@@ -318,8 +319,13 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       al romperse la red, rótulos y sonidos; resumen al final de cada ronda
       (se cierra solo si solo juegan IAs) y pantalla final. Atajos: R, P y
       1-3. El juego ya aparece en el menú, con guardado automático.
-- [ ] **Bajamar, fase 5: red local y pulido.** Resumen de cada ronda,
-      animaciones y ajustes.
+- [x] **Bajamar, fase 5: red local y pulido.** Probado en red con un
+      anfitrión y dos clientes (hasta 5 plazas con IAs): todos terminan con
+      el mismo historial, y si un cliente se desconecta una IA ocupa su plaza
+      y la partida sigue. En red, el resumen de ronda se cierra solo para que
+      nadie bloquee. El resumen y la pantalla final enseñan las cartas de
+      cada red (las rotas, oscurecidas), el riesgo de tormenta cambia de
+      color y hay sonidos propios (trueno, gaviota y ola).
 
 ### Opciones de cada juego
 

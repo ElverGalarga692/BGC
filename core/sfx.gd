@@ -38,6 +38,10 @@ func _ready() -> void:
 		&"whisper": _whisper(),
 		&"crisis": _drum_roll(),
 		&"win_sombra": _tone([440.0, 523.25, 659.25, 622.25, 440.0], 0.17, 0.26, 0.6),
+		# Bajamar.
+		&"thunder": _thunder(),
+		&"gull": _gull(),
+		&"wave": _wave(),
 	}
 	for sound in _streams.keys():
 		for ext in ["wav", "ogg"]:
@@ -241,4 +245,54 @@ func _drum_roll() -> AudioStreamWAV:
 	for i in s.size() - boom:
 		var t := float(i) / RATE
 		s[boom + i] += 0.6 * sin(TAU * (80.0 - 30.0 * t) * t) * exp(-t * 12.0)
+	return _to_stream(s)
+
+
+## Trueno: chasquido y retumbo grave de ruido filtrado (tormenta).
+func _thunder() -> AudioStreamWAV:
+	var s := _buffer(1.6)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 23
+	var low := 0.0
+	var lower := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		var n := rng.randf_range(-1.0, 1.0)
+		low = low * 0.96 + n * 0.04
+		lower = lower * 0.99 + low * 0.01
+		var crack := n * exp(-t * 30.0) * 0.35
+		var rumble := (low * 3.0 + lower * 14.0) * exp(-t * 2.2) * minf(1.0, t * 12.0) * (0.75 + 0.25 * sin(TAU * 3.0 * t))
+		s[i] = crack + 0.55 * rumble
+	return _to_stream(s)
+
+
+## Graznido de gaviota: dos «kiaa» que bajan de tono.
+func _gull() -> AudioStreamWAV:
+	var s := _buffer(0.62)
+	for call in 2:
+		var start := int(call * 0.28 * RATE)
+		var length := int(0.24 * RATE)
+		var phase := 0.0
+		for i in length:
+			if start + i >= s.size():
+				break
+			var t := float(i) / RATE
+			var f := lerpf(1650.0, 1050.0, t / 0.24) * (1.0 + 0.03 * sin(TAU * 38.0 * t))
+			phase += TAU * f / RATE
+			var env := minf(1.0, t * 80.0) * exp(-t * 7.0)
+			s[start + i] += 0.2 * env * (sin(phase) + 0.45 * sin(phase * 2.0) + 0.2 * sin(phase * 3.0))
+	return _to_stream(s)
+
+
+## Ola: ruido que crece y rompe (marea alta).
+func _wave() -> AudioStreamWAV:
+	var s := _buffer(1.3)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 29
+	var a := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		a = a * 0.7 + rng.randf_range(-1.0, 1.0) * 0.3
+		var env := pow(sin(PI * minf(t / 1.3, 1.0)), 2.0) * (1.0 + 0.6 * exp(-pow((t - 0.7) * 6.0, 2.0)))
+		s[i] = 0.4 * env * a
 	return _to_stream(s)

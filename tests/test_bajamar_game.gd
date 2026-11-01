@@ -287,3 +287,16 @@ func test_full_games_finish_and_keep_cards() -> void:
 			assert_true(g.finished, "%d jugadores, semilla %d" % [n, seed_value])
 			assert_true(g.scores.max() >= D.TARGET_SCORE)
 			assert_eq(_total_cards(g), D.deck().size(), "no se pierden cartas")
+
+
+func test_last_nets_keep_ported_and_broken_cards() -> void:
+	var g := _game(2)
+	var a := D.fish(0, 4)
+	var b := D.fish(1, 2)
+	_rig(g, [a, b, D.STORM])
+	_do(g, G.DRAW_BLIND)  # J0: a
+	_do(g, G.DRAW_BLIND)  # J1: b
+	_do(g, G.GO_TO_PORT)  # J0 en puerto con a
+	_do(g, G.DRAW_BLIND)  # J1: tormenta → se rompe con b; termina la ronda
+	assert_eq(g.last_nets, [[a], [b]])
+	assert_true(g.lost_nets[1].is_empty(), "la ronda nueva empieza limpia")

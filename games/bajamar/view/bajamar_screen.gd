@@ -24,6 +24,9 @@ const AI_DELAY := 0.75
 const AI_DELAY_FAST := 0.15
 ## Sin personas en este equipo, el resumen de la ronda se cierra solo.
 const SUMMARY_AUTO_CLOSE := 3.5
+## En red, el resumen se cierra solo también con personas (nadie bloquea).
+const SUMMARY_AUTO_CLOSE_NET := 7.0
+const SUMMARY_CARD := Vector2(32, 45)
 const ERROR_COLOR := Color("ff8a80")
 const BIG_CARD := Vector2(70, 98)
 const NET_CARD := Vector2(46, 64)
@@ -66,6 +69,7 @@ var _broken_flash: Dictionary = {}    # pid -> true
 var _last_market: Array[int] = []
 ## Resultados de la última ronda terminada (para el resumen).
 var _round_results: Array = []
+var _round_nets: Array = []
 var _round_shown := 0
 
 
@@ -438,6 +442,7 @@ func _refresh_table() -> void:
 	_deck_label.text = _plural(game.deck.size(), "carta", "cartas")
 	_deck_card.visible = game.cards_left() > 0
 	_risk_label.text = "Tormenta: %d %%" % roundi(game.storm_chance() * 100.0)
+	_risk_label.add_theme_color_override("font_color", _risk_color(game.storm_chance()))
 	var actor := _local_actor()
 	_deck_card.clickable = actor >= 0 and game.pending_gulls.is_empty() and game.cards_left() > 0
 	# Mercado: las cartas nuevas se voltean al aparecer.
@@ -497,7 +502,9 @@ func _boat(pid: int) -> Control:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(spacer)
-	if game.status[pid] != Status.BROKEN:
+	if game.finished and pid < game.last_round.size():
+		head.add_child(_tag("+%d" % int(game.last_round[pid]["total"]), 16, BGCTheme.ACCENT))
+	elif game.status[pid] != Status.BROKEN:
 		head.add_child(_tag("%d pts" % int(game.net_score(pid)["total"]), 16, BGCTheme.ACCENT))
 	elif game.salvaged[pid] > 0:
 		head.add_child(_tag("salva %d" % game.salvaged[pid], 16, BGCTheme.ACCENT))
@@ -506,11 +513,15 @@ func _boat(pid: int) -> Control:
 	cards.add_theme_constant_override("h_separation", 4)
 	cards.add_theme_constant_override("v_separation", 4)
 	cards.custom_minimum_size = Vector2(0, NET_CARD.y)
-	var net := game.net(pid)
+	var net: Array = game.net(pid)
+	var ended := game.finished and pid < game.last_nets.size()
+	if ended:
+		net = game.last_nets[pid]  # al terminar, la mesa enseña la última ronda
 	var fresh: int = _fresh_net.get(pid, 0)
 	for i in net.size():
 		var view := Card.new(net[i], NET_CARD)
 		view.tooltip_text = D.card_name(net[i])
+		view.dimmed = ended and game.status[pid] == Status.BROKEN
 		cards.add_child(view)
 		if i >= net.size() - fresh:
 			view.flip_in(0.05 * (i - (net.size() - fresh)))
@@ -560,6 +571,14 @@ func _refresh_actions() -> void:
 		var who := game.players[actor]
 		_prompt_label.text = ("Juega %s (IA)..." if who.is_ai or _ais.has(actor) else "Esperando a %s...") % who.display_name
 	_fill_info(local if local >= 0 else actor)
+
+
+## Verde con poco riesgo, amarillo y rojo a partir de un 20 %.
+func _risk_color(chance: float) -> Color:
+	var t := clampf(chance / 0.2, 0.0, 1.0)
+	if t < 0.5:
+		return Color("8fd694").lerp(BGCTheme.ACCENT, t * 2.0)
+	return BGCTheme.ACCENT.lerp(ERROR_COLOR, (t - 0.5) * 2.0)
 
 
 ## Lo que daría coger `card` del mercado y volver a puerto.
@@ -734,7 +753,7 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 			var extra := " La red reforzada salva %d puntos." % salvaged if salvaged > 0 else ""
 			_add_log("[color=#ff8a80][b]¡Tormenta! Se rompe la red de %s.[/b][/color]%s" % [game.players[pid].display_name, extra])
 			_broken_flash[pid] = true
-			Sfx.play(&"robber")
+			Sfx.play(&"thunder")
 			_show_banner("¡Tormenta! Red rota: %s" % game.players[pid].display_name, ERROR_COLOR)
 		&"storm_passed":
 			_add_log("[color=#9fb8c8]Una tormenta pasa de largo por el mercado.[/color]")
@@ -747,13 +766,13 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 			var target: int = data["target"]
 			_add_log("La gaviota de %s le quita %s a %s." % [_player_name(pid), _card_bbcode(data["card"]), _player_name(target)])
 			_fresh_net[pid] = _fresh_net.get(pid, 0) + 1
-			Sfx.play(&"trade")
+			Sfx.play(&"gull")
 			_show_banner("¡Gaviota! %s → %s" % [game.players[target].display_name, game.players[pid].display_name], Color("e9eef2"))
 		&"gull_wasted":
 			_add_log("La gaviota de %s no encuentra nada que robar." % _player_name(pid))
 		&"tide":
 			_add_log("[b]¡Marea alta![/b] Todos los que siguen en el mar roban una carta.")
-			Sfx.play(&"resource")
+			Sfx.play(&"wave")
 			_show_banner("¡Marea alta!", Color("9fd0e8"))
 		&"tide_wasted":
 			_add_log("   Otra Marea alta: esta no tiene efecto.")
@@ -764,6 +783,7 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 			_add_log("Se acaba el mazo: se barajan los descartes (%d cartas)." % data["cards"])
 		&"round_end":
 			_round_results = data["results"]
+			_round_nets = data["nets"]
 			_round_shown = data["round"]
 			_after_round_end.call_deferred()
 		&"round_start":
@@ -789,8 +809,10 @@ func _show_summary() -> void:
 	box.add_child(button)
 	_summary.visible = true
 	Sfx.play(&"turn")
-	if not _has_local_humans():
+	if not _has_local_humans() or _network:
 		var wait := 1.2 if _ai_fast_toggle.button_pressed else SUMMARY_AUTO_CLOSE
+		if _network and _has_local_humans():
+			wait = SUMMARY_AUTO_CLOSE_NET
 		var generation := _ai_generation
 		get_tree().create_timer(wait).timeout.connect(func() -> void:
 			if generation == _ai_generation and _summary.visible:
@@ -809,16 +831,27 @@ func _close_summary() -> void:
 ## Tabla de resultados de una ronda: jugador, lo que ganó y su total.
 func _results_grid(results: Array) -> GridContainer:
 	var grid := GridContainer.new()
-	grid.columns = 3
+	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 18)
-	grid.add_theme_constant_override("v_separation", 6)
-	for h in ["Jugador", "Esta ronda", "Total"]:
+	grid.add_theme_constant_override("v_separation", 8)
+	for h in ["Jugador", "Red", "Esta ronda", "Total"]:
 		grid.add_child(_tag(h, 13, BGCTheme.TEXT_DIM))
 	var order := range(game.players.size())
 	order.sort_custom(func(a: int, b: int) -> bool: return game.scores[a] > game.scores[b])
 	for pid in order:
 		var r: Dictionary = results[pid] if pid < results.size() else {"total": 0}
 		grid.add_child(_tag(game.players[pid].display_name, 16, game.players[pid].color.lightened(0.3)))
+		var cards := HBoxContainer.new()
+		cards.add_theme_constant_override("separation", 2)
+		cards.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var net: Array = _round_nets[pid] if pid < _round_nets.size() else []
+		for c in net:
+			var view := Card.new(c, SUMMARY_CARD)
+			view.dimmed = r.get("broken", false)
+			cards.add_child(view)
+		if net.is_empty():
+			cards.add_child(_tag("—", 14, BGCTheme.TEXT_DIM))
+		grid.add_child(cards)
 		var text := "+%d" % r["total"]
 		var color := BGCTheme.TEXT
 		if r.get("broken", false):

@@ -81,6 +81,11 @@ var pending_gulls: Array[int] = []
 ## Puntos de la última ronda terminada, por jugador (desglose de
 ## BajamarDefs.score, o {"total": puntos salvados, "broken": true}).
 var last_round: Array = []
+## Cartas con las que acabó cada jugador la última ronda terminada (la red que
+## llevó a puerto, o la que se le rompió).
+var last_nets: Array = []
+## Durante la ronda: la red que se le rompió a cada jugador (o vacía).
+var lost_nets: Array = []
 
 
 func _on_setup() -> void:
@@ -100,6 +105,10 @@ func _on_setup() -> void:
 	scores.assign(_filled(players.size(), 0))
 	pending_gulls.clear()
 	last_round.clear()
+	last_nets.clear()
+	lost_nets.clear()
+	for p in players.size():
+		lost_nets.append([] as Array[int])
 	_start_round()
 
 
@@ -272,6 +281,7 @@ func _storm(pid: int) -> void:
 		shields[pid] = false
 		discard.append(D.SHIELD)
 	status[pid] = Status.BROKEN
+	lost_nets[pid] = nets[pid].duplicate()
 	discard.append_array(nets[pid])
 	discard.append(D.STORM)
 	nets[pid] = [] as Array[int]
@@ -342,6 +352,7 @@ func _start_round() -> void:
 		nets[p] = [] as Array[int]
 		shields[p] = false
 		salvaged[p] = 0
+		lost_nets[p] = [] as Array[int]
 		status[p] = Status.AT_SEA
 	# Cada ronda empieza con todo el riesgo: los descartes vuelven al mazo.
 	if not discard.is_empty():
@@ -355,7 +366,9 @@ func _start_round() -> void:
 
 func _end_round() -> void:
 	last_round.clear()
+	last_nets.clear()
 	for p in players.size():
+		last_nets.append(nets[p].duplicate() if status[p] == Status.IN_PORT else lost_nets[p].duplicate())
 		var result: Dictionary
 		if status[p] == Status.IN_PORT:
 			result = D.score(nets[p])
@@ -368,7 +381,7 @@ func _end_round() -> void:
 			discard.append(D.SHIELD)
 		nets[p] = [] as Array[int]
 		shields[p] = false
-	event.emit(&"round_end", {"round": round_number, "results": last_round.duplicate(true)})
+	event.emit(&"round_end", {"round": round_number, "results": last_round.duplicate(true), "nets": last_nets.duplicate(true)})
 	var best: int = scores.max()
 	if best >= target_score:
 		var winners: Array[int] = []
