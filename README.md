@@ -46,12 +46,21 @@ games/archipelago/
     arch_defs.gd         Terrenos, recursos, fichas, puertos
     arch_board.gd        Tablero: terrenos, números, puertos, bandido
     board_generator.gd   Generación aleatoria equilibrada
-    archipelago_game.gd  La partida (GameBase)
+    archipelago_game.gd  La partida (GameBase): fases, reglas y acciones
   view/                  Escenas y dibujo
-    board_view.gd        Dibuja el tablero y detecta el elemento bajo el ratón
-    archipelago_screen.gd  Pantalla de juego + HUD
+    board_view.gd        Vista 2D: tablero, piezas, objetivos y detección
+    archipelago_screen.gd  Pantalla de juego: HUD, registro, acciones
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
+
+### Vistas intercambiables (2D hoy, 3D en el futuro)
+
+La pantalla solo habla con la vista del tablero a través de un contrato
+pequeño, documentado en `board_view.gd`: la propiedad `game`,
+`set_targets()`, `refresh()`, `fit()` y las señales `hovered` y `clicked`.
+La detección trabaja en "unidades de hexágono" con `HexGrid`, así que una
+vista 3D solo tiene que proyectar el rayo del ratón sobre el plano del
+tablero y reutilizar esa misma detección.
 
 ### Añadir un juego nuevo
 
@@ -67,9 +76,10 @@ tests/                   Tests sin dependencias externas (test_*.gd)
 - [x] **Fase 1: tablero.** Grafo de hexágonos, vértices y aristas;
       generación equilibrada (6 y 8 nunca vecinos, puertos repartidos);
       dibujo; detección de casilla, vértice y arista.
-- [ ] **Fase 2: reglas básicas.** Colocación inicial en serpiente, dados y
+- [x] **Fase 2: reglas básicas.** Colocación inicial en serpiente, dados y
       producción, construir caminos, poblados y ciudades, comercio con la
-      banca y los puertos, puntos de victoria.
+      banca y los puertos, puntos de victoria (10). Interfaz para jugar en
+      local por turnos.
 - [ ] **Fase 3: reglas completas.** El 7 (descartes y bandido), cartas de
       desarrollo, ejército más grande, camino más largo, comercio entre
       jugadores.

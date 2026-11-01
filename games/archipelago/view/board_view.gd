@@ -1,7 +1,17 @@
 class_name ArchBoardView
 extends Node2D
-## Dibuja un ArchBoard y detecta qué elemento (casilla, vértice o arista)
-## hay bajo el ratón. No modifica el tablero: solo emite señales.
+## Vista 2D del tablero: dibuja el tablero y las piezas, y detecta qué
+## elemento (casilla, vértice o arista) hay bajo el ratón.
+##
+## Contrato con la pantalla (una futura vista 3D debe cumplir lo mismo):
+##   - propiedad `game`: la partida que se dibuja (solo lectura),
+##   - set_targets(kind, ids): resalta los sitios donde se puede jugar y
+##     limita los clics a ellos (Pick.NONE para quitar),
+##   - refresh(): vuelve a dibujar tras un cambio en la partida,
+##   - fit(rect): encaja el tablero en un rectángulo de la pantalla,
+##   - señales hovered(kind, id) y clicked(kind, id).
+## La detección se hace en "unidades de hexágono" con HexGrid, así que una
+## vista 3D solo tiene que proyectar el rayo del ratón sobre el plano.
 
 enum Pick { NONE, TILE, VERTEX, EDGE }
 
@@ -16,6 +26,7 @@ const TOKEN_TEXT := Color("2b2b2b")
 const HOT_TEXT := Color("c0392b")
 const HOVER_COLOR := Color(1, 1, 1, 0.85)
 const SELECT_COLOR := Color("ffd166")
+const PIECE_OUTLINE := Color("1b1b1b")
 const RESOURCE_COLORS := {
 	ArchDefs.ResourceType.WOOD: Color("2f7a3b"),
 	ArchDefs.ResourceType.BRICK: Color("c4623a"),
@@ -30,12 +41,14 @@ const SEA_RADIUS := 5.9
 const VERTEX_PICK_RADIUS := 0.22
 const EDGE_PICK_RADIUS := 0.24
 
-var board: ArchBoard:
+var game: ArchipelagoGame:
 	set(value):
-		board = value
+		game = value
+		board = game.board if game != null else null
 		_hover = [Pick.NONE, -1]
-		_selected = [Pick.NONE, -1]
-		queue_redraw()
+		set_targets(Pick.NONE, [])
+
+var board: ArchBoard
 
 ## Radio de cada hexágono en píxeles.
 var hex_size := 48.0:
@@ -44,7 +57,9 @@ var hex_size := 48.0:
 		queue_redraw()
 
 var _hover: Array = [Pick.NONE, -1]
-var _selected: Array = [Pick.NONE, -1]
+var _target_kind: Pick = Pick.NONE
+var _target_ids: Array[int] = []
+var _time := 0.0
 
 
 ## Tamaño del tablero (con el mar) en unidades de hexágono, para encajarlo.
@@ -52,11 +67,37 @@ static func extent() -> Vector2:
 	return Vector2(SEA_RADIUS * 2.0, SEA_RADIUS * HexCoords.SQRT3)
 
 
-## Qué hay en un punto en coordenadas locales (píxeles).
+func set_targets(kind: Pick, ids: Array[int]) -> void:
+	_target_kind = kind if not ids.is_empty() else Pick.NONE
+	_target_ids = ids
+	_hover = pick_at(get_local_mouse_position())
+	queue_redraw()
+
+
+func refresh() -> void:
+	queue_redraw()
+
+
+func fit(rect: Rect2) -> void:
+	var e := extent()
+	hex_size = minf(rect.size.x / e.x, rect.size.y / e.y) * 0.96
+	position = rect.get_center()
+
+
+func _process(delta: float) -> void:
+	if _target_kind != Pick.NONE:
+		_time += delta
+		queue_redraw()
+
+
+## Qué hay en un punto en coordenadas locales (píxeles). Si hay objetivos
+## marcados, solo devuelve uno de ellos.
 func pick_at(local_point: Vector2) -> Array:
 	if board == null:
 		return [Pick.NONE, -1]
 	var p := local_point / hex_size
+	if _target_kind != Pick.NONE:
+		return _pick_target(p)
 	var v := board.grid.vertex_near(p, VERTEX_PICK_RADIUS)
 	if v >= 0:
 		return [Pick.VERTEX, v]
@@ -78,9 +119,25 @@ func _unhandled_input(event: InputEvent) -> void:
 			queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var pick := pick_at(get_local_mouse_position())
-		_selected = [Pick.NONE, -1] if pick == _selected else pick
-		clicked.emit(pick[0], pick[1])
-		queue_redraw()
+		if pick[0] != Pick.NONE:
+			clicked.emit(pick[0], pick[1])
+			get_viewport().set_input_as_handled()
+
+
+func _pick_target(p: Vector2) -> Array:
+	var best := -1
+	var best_d := 0.5
+	for id in _target_ids:
+		var pos: Vector2
+		match _target_kind:
+			Pick.VERTEX: pos = board.grid.vertex_positions[id]
+			Pick.EDGE: pos = board.grid.edge_midpoint(id)
+			Pick.TILE: pos = board.grid.tile_center(id)
+		var d := pos.distance_to(p)
+		if d < best_d:
+			best = id
+			best_d = d
+	return [_target_kind, best] if best >= 0 else [Pick.NONE, -1]
 
 
 func _draw() -> void:
@@ -91,8 +148,75 @@ func _draw() -> void:
 		_draw_port(port)
 	for t in board.grid.tile_count():
 		_draw_tile(t)
-	_draw_highlight(_hover, HOVER_COLOR)
-	_draw_highlight(_selected, SELECT_COLOR)
+	if game != null:
+		for e in game.edge_owner.size():
+			if game.edge_owner[e] != -1:
+				_draw_road(e, _player_color(game.edge_owner[e]))
+		for v in game.vertex_owner.size():
+			if game.vertex_owner[v] != -1:
+				_draw_building(v, game.vertex_building[v], _player_color(game.vertex_owner[v]))
+	_draw_targets()
+	if _target_kind == Pick.NONE:
+		_draw_highlight(_hover, HOVER_COLOR)
+	elif _hover[0] != Pick.NONE:
+		_draw_highlight(_hover, SELECT_COLOR)
+
+
+func _player_color(pid: int) -> Color:
+	return game.players[pid].color
+
+
+func _draw_road(e: int, color: Color) -> void:
+	var ev: Array = board.grid.edge_vertices[e]
+	var a := board.grid.vertex_positions[ev[0]] * hex_size
+	var b := board.grid.vertex_positions[ev[1]] * hex_size
+	var shrink := (b - a) * 0.14
+	draw_line(a + shrink, b - shrink, PIECE_OUTLINE, hex_size * 0.2, true)
+	draw_line(a + shrink, b - shrink, color, hex_size * 0.13, true)
+
+
+func _draw_building(v: int, building: int, color: Color) -> void:
+	var c := board.grid.vertex_positions[v] * hex_size
+	var s := hex_size * 0.17
+	var shape: PackedVector2Array
+	if building == ArchipelagoGame.Building.CITY:
+		# Casa con torre a la izquierda.
+		shape = PackedVector2Array([
+			c + Vector2(-1.5, 1) * s, c + Vector2(1.5, 1) * s, c + Vector2(1.5, -0.3) * s,
+			c + Vector2(0.75, -1.0) * s, c + Vector2(0, -0.3) * s, c + Vector2(0, -0.8) * s,
+			c + Vector2(-0.75, -1.6) * s, c + Vector2(-1.5, -0.8) * s,
+		])
+	else:
+		shape = PackedVector2Array([
+			c + Vector2(-1, 1) * s, c + Vector2(1, 1) * s, c + Vector2(1, -0.2) * s,
+			c + Vector2(0, -1.2) * s, c + Vector2(-1, -0.2) * s,
+		])
+	draw_colored_polygon(shape, color)
+	shape.append(shape[0])
+	draw_polyline(shape, PIECE_OUTLINE, maxf(1.5, hex_size * 0.04), true)
+
+
+func _draw_targets() -> void:
+	var pulse := 0.65 + 0.35 * sin(_time * 5.0)
+	var color := Color(SELECT_COLOR, pulse)
+	var backing := Color(0.1, 0.1, 0.1, 0.55)
+	for id in _target_ids:
+		match _target_kind:
+			Pick.VERTEX:
+				var c := board.grid.vertex_positions[id] * hex_size
+				draw_circle(c, hex_size * 0.14, backing)
+				draw_arc(c, hex_size * 0.11, 0, TAU, 24, color, hex_size * 0.05, true)
+			Pick.EDGE:
+				var ev: Array = board.grid.edge_vertices[id]
+				var a := board.grid.vertex_positions[ev[0]] * hex_size
+				var b := board.grid.vertex_positions[ev[1]] * hex_size
+				var shrink := (b - a) * 0.22
+				draw_line(a + shrink, b - shrink, backing, hex_size * 0.14, true)
+				draw_line(a + shrink, b - shrink, color, hex_size * 0.07, true)
+			Pick.TILE:
+				var c := board.grid.tile_center(id) * hex_size
+				draw_circle(c, hex_size * 0.16, backing)
+				draw_arc(c, hex_size * 0.13, 0, TAU, 24, color, hex_size * 0.05, true)
 
 
 func _draw_sea() -> void:
