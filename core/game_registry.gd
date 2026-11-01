@@ -22,6 +22,8 @@ static func all_games() -> Array[Dictionary]:
 			"rules": "res://games/conjura/rules.txt",
 			"min_players": 5,
 			"max_players": 10,
+			# Colores del emblema de la tarjeta del menú.
+			"colors": [Color("4f8fd6"), Color("b8404f"), Color("c9a96e"), Color("3a2d4a"), Color("e3b34c"), Color("7a2f3b")],
 		},
 	]
 

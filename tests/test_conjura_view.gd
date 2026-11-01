@@ -132,6 +132,18 @@ func test_finished_game_reveals_everything() -> void:
 	game.submit(GameAction.new(G.ENACT, game.council, {"index": 0}))
 	assert_true(game.finished)
 	assert_eq(game.view_for(-1)["known_roles"].size(), 5)
+	var truth: Dictionary = game.view_for(-1)["truth"]
+	assert_eq(truth[0]["drawn"], [Edict.GUARDIA, Edict.GUARDIA, Edict.GUARDIA] as Array[int], "al final se sabe qué se robó")
+	assert_eq(truth[0]["passed"].size(), 2)
+
+
+func test_truth_hidden_during_game() -> void:
+	var game := _game()
+	game.submit(GameAction.new(G.NOMINATE, game.regent, {"target": game.eligible_nominees()[0]}))
+	for pid in 5:
+		game.submit(GameAction.new(G.VOTE, pid, {"yes": true}))
+	for seat in range(-1, 5):
+		assert_false(game.view_for(seat).has("truth"), "la verdad no se ve durante la partida (asiento %d)" % seat)
 
 
 func test_ai_games_finish() -> void:

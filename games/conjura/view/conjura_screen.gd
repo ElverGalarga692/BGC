@@ -63,6 +63,10 @@ var _overlay_seat := -1
 var _overlay_kind := ""
 var _overlay_stage := ""
 var _victory: Control
+var _vote_reveal: ConjuraVoteReveal
+## Rótulos pendientes de mostrar uno tras otro: [texto, color].
+var _banner_queue: Array = []
+var _banner_busy := false
 
 
 func _ready() -> void:
@@ -306,6 +310,9 @@ func _build_overlays() -> void:
 	for side in ["right", "top", "bottom"]:
 		_overlay_dock.add_theme_constant_override("margin_" + side, 12)
 	_overlay.add_child(_overlay_dock)
+	_vote_reveal = ConjuraVoteReveal.new()
+	add_child(_vote_reveal)
+	_vote_reveal.closed.connect(_refresh)
 	_victory = _modal(Color(0, 0, 0, 0.75))
 
 
@@ -400,6 +407,7 @@ func _refresh_actions(pub: Dictionary) -> void:
 	_phase_label.text = G.PHASE_NAMES[phase]
 	if game.finished:
 		_prompt_label.text = game.win_reason
+		_actions_box.add_child(_button("Ver resultados e historial", func() -> void: _victory.visible = true, 15, "PrimaryButton"))
 		return
 	var actor := _local_actor()
 	var regent := _player_name_plain(pub["regent"])
@@ -504,6 +512,9 @@ func _refresh_info() -> void:
 func _update_overlay() -> void:
 	if _overlay_kind == "picker":
 		return  # el selector de «Ver mi información» sigue abierto
+	if _vote_reveal.visible:
+		_overlay.visible = false  # primero se ven los votos (al cerrarse, _refresh)
+		return
 	if game.finished:
 		_overlay.visible = false
 		return
@@ -617,21 +628,11 @@ func _card_row(cards: Array, on_pick: Callable, verb: String) -> HBoxContainer:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 14)
 	for i in cards.size():
-		var edict: int = cards[i]
-		var color := D.edict_color(edict)
-		var b := Button.new()
-		b.text = "%s\n\n%s" % [D.EDICT_SHORT[edict], verb]
-		b.custom_minimum_size = Vector2(130, 170)
-		b.add_theme_font_size_override("font_size", 18)
-		b.add_theme_stylebox_override("normal", BGCTheme.box(color.darkened(0.15), color.lightened(0.4), 12, 3, 6))
-		b.add_theme_stylebox_override("hover", BGCTheme.box(color, Color.WHITE, 12, 3, 9))
-		b.add_theme_stylebox_override("pressed", BGCTheme.box(color.darkened(0.3), Color.WHITE, 12, 3, 2))
-		b.add_theme_color_override("font_color", Color.WHITE)
-		b.add_theme_color_override("font_hover_color", Color.WHITE)
-		b.pressed.connect(func() -> void:
+		var card := ConjuraArt.EdictCard.new(int(cards[i]), verb)
+		card.pressed.connect(func() -> void:
 			Sfx.play(&"card")
 			on_pick.call(i))
-		row.add_child(b)
+		row.add_child(card)
 	return row
 
 
@@ -643,8 +644,14 @@ func _fill_identity(box: VBoxContainer, seat: int, font_size: int) -> void:
 	var color := D.faction_color(D.faction_of(role))
 	var role_panel := PanelContainer.new()
 	role_panel.add_theme_stylebox_override("panel", BGCTheme.box(Color(color, 0.25), color, 12, 2, 0, 10))
+	var role_row := HBoxContainer.new()
+	role_row.add_theme_constant_override("separation", 12)
+	role_panel.add_child(role_row)
+	var card_w := 64.0 + font_size * 2.0
+	role_row.add_child(ConjuraArt.RoleCard.new(role, Vector2(card_w, card_w * 1.4)))
 	var role_box := VBoxContainer.new()
-	role_panel.add_child(role_box)
+	role_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	role_row.add_child(role_box)
 	role_box.add_child(_label("Tu rol", font_size - 3, BGCTheme.TEXT_DIM))
 	var name_label := _label(D.ROLE_NAMES[role], font_size + 8, color.lightened(0.4))
 	name_label.add_theme_font_override("font", BGCTheme.bold_font(0.8))
@@ -778,6 +785,11 @@ func _run_ai(generation: int) -> void:
 	_ai_pending = false
 	if game.finished:
 		return
+	if _vote_reveal.visible:
+		# Se espera a que termine la revelación de los votos.
+		_ai_pending = true
+		get_tree().create_timer(0.3).timeout.connect(_run_ai.bind(generation))
+		return
 	var actor := _ai_actor()
 	if actor == -1:
 		return
@@ -878,7 +890,12 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 				(yes_names if data["votes"][pid] else no_names).append(game.players[pid].display_name)
 			var result := "[color=#8fd694]APROBADO[/color]" if data["approved"] else "[color=#ff8a80]RECHAZADO[/color]"
 			_add_log("Votación: %s (%d a %d). Sí: %s. No: %s." % [result, yes_names.size(), no_names.size(), _join(yes_names), _join(no_names)])
-			Sfx.play(&"trade" if data["approved"] else &"error")
+			var entries: Array = []
+			var voters: Array = data["votes"].keys()
+			voters.sort()
+			for pid in voters:
+				entries.append({"name": game.players[pid].display_name, "color": game.players[pid].color, "yes": data["votes"][pid]})
+			_vote_reveal.reveal(entries, data["approved"], yes_names.size(), no_names.size())
 		&"claimed":
 			var role_name := "Regente" if data["as_regent"] else "Consejero"
 			_add_log("%s (%s) %s." % [_player_name(data["player"]), role_name, _claim_text(data["cards"], data["as_regent"])])
@@ -887,13 +904,15 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 				_add_log("[color=#e07a3c][b]Las declaraciones no cuadran: alguien miente.[/b][/color]")
 		&"crisis":
 			_add_log("[b][color=#e07a3c]¡Crisis![/color][/b] Tres votaciones fallidas: se promulga el primer edicto del mazo y sube el descontento.")
-			Sfx.play(&"robber")
+			Sfx.play(&"crisis")
+			_show_banner("¡Crisis!", Color("e07a3c"))
 		&"enacted":
 			var edict: int = data["edict"]
 			var color := D.edict_color(edict).lightened(0.3).to_html(false)
 			_add_log("[b]Se promulga un [color=#%s]%s[/color].[/b]" % [color, D.EDICT_NAMES[edict]])
 			_board.pulse(edict)
-			Sfx.play(&"card")
+			Sfx.play(&"seal")
+			_show_banner(D.EDICT_NAMES[edict], D.edict_color(edict))
 			if edict == Edict.NEUTRAL:
 				_add_log("El descontento sube.")
 		&"power_offer":
@@ -913,11 +932,14 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 					_add_log("%s mira el edicto que descartó el Regente." % _player_name(council))
 				Power.SUCESION:
 					_add_log("%s nombra próximo Regente a %s." % [_player_name(council), _player_name(data["target"])])
-			if power in [Power.ESPIAR, Power.AUGURIO, Power.PESQUISA] and _is_local(council):
-				_private_queue.append({"seat": council, "kind": "result"})
+			if power in [Power.ESPIAR, Power.AUGURIO, Power.PESQUISA]:
+				Sfx.play(&"whisper")
+				if _is_local(council):
+					_private_queue.append({"seat": council, "kind": "result"})
 		&"banished":
 			_add_log("[b]%s queda desterrado.[/b]" % _player_name(data["target"]))
-			Sfx.play(&"robber")
+			Sfx.play(&"gong")
+			_show_banner("%s, desterrado" % game.players[data["target"]].display_name, Color("c9a96e"))
 		&"reshuffle":
 			_add_log("Se baraja el descarte: el mazo vuelve a tener %d edictos." % data["count"])
 		&"new_round":
@@ -933,7 +955,7 @@ func _on_game_finished(_winner_ids: Array[int]) -> void:
 func _show_victory() -> void:
 	_overlay.visible = false
 	_private_queue.clear()
-	Sfx.play(&"win")
+	Sfx.play(&"win" if game.winner_faction == Faction.GUARDIA else &"win_sombra")
 	var faction := game.winner_faction
 	var color := D.faction_color(faction)
 	_add_log("[b]Fin: gana la %s.[/b] %s" % [D.FACTION_NAMES[faction], game.win_reason])
@@ -946,16 +968,33 @@ func _show_victory() -> void:
 	var reason := _label(game.win_reason, 16)
 	reason.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(reason)
-	box.add_child(_label("Roles", 14, BGCTheme.TEXT_DIM))
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 24)
-	var roles: Dictionary = game.view_for(-1)["known_roles"]
+	var final_view := game.view_for(-1)
+	# Roles: una carta por jugador.
+	var roles: Dictionary = final_view["known_roles"]
+	var cards := HFlowContainer.new()
+	cards.alignment = FlowContainer.ALIGNMENT_CENTER
+	cards.add_theme_constant_override("h_separation", 10)
+	cards.add_theme_constant_override("v_separation", 6)
 	for p in game.players:
-		grid.add_child(_tag(p.display_name, 16, p.color.lightened(0.3)))
-		var role: int = roles[p.id]
-		grid.add_child(_tag(D.ROLE_NAMES[role], 16, D.faction_color(D.faction_of(role)).lightened(0.35)))
-	box.add_child(grid)
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 2)
+		cell.add_child(ConjuraArt.RoleCard.new(roles[p.id], Vector2(62, 86)))
+		var name_label := _tag(p.display_name, 13, p.color.lightened(0.3))
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_label.custom_minimum_size.x = 62
+		name_label.clip_text = true
+		cell.add_child(name_label)
+		cards.add_child(cell)
+	box.add_child(cards)
+	# Historial: lo que se dijo frente a lo que pasó de verdad.
+	box.add_child(_label("Historial de gobiernos (lo que dijeron · lo que pasó de verdad)", 14, BGCTheme.TEXT_DIM))
+	var history := RichTextLabel.new()
+	history.bbcode_enabled = true
+	history.custom_minimum_size = Vector2(0, 210)
+	history.add_theme_font_size_override("normal_font_size", 13)
+	history.add_theme_font_size_override("bold_font_size", 13)
+	history.text = _history_bbcode(final_view)
+	box.add_child(history)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	if not _network:
@@ -969,19 +1008,87 @@ func _show_victory() -> void:
 	menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(menu)
 	box.add_child(row)
+	var panel: Control = box.get_parent()
+	panel.custom_minimum_size = Vector2(minf(900.0, size.x - 40.0), 0)
 	_victory.visible = true
 	_refresh()
 
 
+## Historial final en BBCode: cada gobierno, sus votos, sus declaraciones y
+## lo que de verdad se robó y se pasó (marcando las mentiras).
+func _history_bbcode(view: Dictionary) -> String:
+	var lines: Array[String] = []
+	var truth: Dictionary = view.get("truth", {})
+	var govs: Array = view["governments"]
+	for i in govs.size():
+		var gov: Dictionary = govs[i]
+		var yes := 0
+		for v in gov["votes"].values():
+			if v:
+				yes += 1
+		var head := "[b]%d.[/b] %s + %s: " % [i + 1, _player_name(gov["regent"]), _player_name(gov["nominee"])]
+		if not gov["approved"]:
+			head += "rechazado %d a %d" % [yes, gov["votes"].size() - yes]
+			if gov["crisis"]:
+				head += " → [b][color=#e07a3c]crisis[/color][/b]: %s" % _edict_bbcode(gov["edict"])
+			lines.append(head)
+			continue
+		head += "aprobado %d a %d" % [yes, gov["votes"].size() - yes]
+		if int(gov["edict"]) >= 0:
+			head += " → %s" % _edict_bbcode(gov["edict"])
+		lines.append(head)
+		var t: Dictionary = truth.get(i, {})
+		if t.is_empty():
+			continue
+		var claims: Dictionary = gov.get("claims", {})
+		var drawn: Array = t.get("drawn", [])
+		var passed: Array = t.get("passed", [])
+		lines.append("     Regente: %s · robó %s" % [_claim_vs_truth(claims.get("regent", null), drawn, claims.has("regent")), _cards_text(drawn)])
+		if not passed.is_empty():
+			lines.append("     Consejero: %s · recibió %s" % [_claim_vs_truth(claims.get("council", null), passed, claims.has("council")), _cards_text(passed)])
+	return "\n".join(lines) if not lines.is_empty() else "No hubo gobiernos."
+
+
+func _edict_bbcode(edict: int) -> String:
+	return "[color=#%s]%s[/color]" % [D.edict_color(edict).lightened(0.3).to_html(false), D.EDICT_SHORT[edict]]
+
+
+func _claim_vs_truth(claim, real: Array, declared: bool) -> String:
+	if not declared or claim == null:
+		return "no dijo nada"
+	var sorted_real := real.duplicate()
+	sorted_real.sort()
+	var text := "dijo %s" % _cards_text(claim)
+	if claim != sorted_real:
+		text += " [b][color=#ff8a80]MINTIÓ[/color][/b]"
+	return text
+
+
 # --- Utilidades ---------------------------------------------------------------------
 
+## Rótulo grande sobre el tablero. Si ya hay uno, espera su turno.
 func _show_banner(text: String, color: Color) -> void:
-	_banner.text = text
-	_banner.add_theme_color_override("font_color", color.lightened(0.3))
+	_banner_queue.append([text, color])
+	if not _banner_busy:
+		_next_banner()
+
+
+func _next_banner() -> void:
+	if _banner_queue.is_empty():
+		_banner_busy = false
+		return
+	_banner_busy = true
+	var item: Array = _banner_queue.pop_front()
+	_banner.text = item[0]
+	_banner.add_theme_color_override("font_color", Color(item[1]).lightened(0.3))
+	_banner.pivot_offset = _banner.size / 2.0
+	_banner.scale = Vector2.ONE * 0.85
 	var tween := create_tween()
-	_banner.modulate.a = 1.0
-	tween.tween_interval(0.8)
-	tween.tween_property(_banner, "modulate:a", 0.0, 0.5)
+	tween.tween_property(_banner, "modulate:a", 1.0, 0.12)
+	tween.parallel().tween_property(_banner, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(0.75)
+	tween.tween_property(_banner, "modulate:a", 0.0, 0.35)
+	tween.tween_callback(_next_banner)
 
 
 func _clear(container: Node) -> void:

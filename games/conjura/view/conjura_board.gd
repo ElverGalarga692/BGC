@@ -129,24 +129,7 @@ func _slot_label(edict: int, index: int) -> String:
 
 
 func _card(rect: Rect2, edict: int, glow: float) -> void:
-	var color := D.edict_color(edict)
-	if glow > 0.0:
-		draw_rect(rect.grow(6.0 * glow), Color(1, 1, 1, 0.5 * glow))
-	draw_rect(rect, color.darkened(0.25))
-	draw_rect(rect.grow(-4), color)
-	draw_rect(rect.grow(-4), Color(1, 1, 1, 0.5), false, 1.5)
-	var c := rect.get_center()
-	var r := rect.size.x * 0.22
-	if edict == Edict.GUARDIA:
-		# Escudo.
-		var pts := PackedVector2Array([c + Vector2(-r, -r), c + Vector2(r, -r), c + Vector2(r, 0.2 * r), c + Vector2(0, r * 1.2), c + Vector2(-r, 0.2 * r)])
-		draw_colored_polygon(pts, Color(1, 1, 1, 0.85))
-	elif edict == Edict.SOMBRA:
-		# Luna creciente.
-		draw_circle(c, r, Color(1, 1, 1, 0.85))
-		draw_circle(c + Vector2(r * 0.45, -r * 0.2), r * 0.85, color)
-	else:
-		draw_circle(c, r * 0.8, Color(1, 1, 1, 0.85))
+	ConjuraArt.draw_edict(self, rect, edict, rect.size.x >= 60.0, glow)
 
 
 func _meter(center: Vector2, title: String, value: int, maximum: int, color: Color) -> void:

@@ -159,7 +159,7 @@ func _game_card(game: Dictionary) -> Button:
 	row.add_theme_constant_override("separation", 18)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(row)
-	var art := HexEmblem.new([], 84)
+	var art := HexEmblem.new(game.get("colors", []), 84)
 	art.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(art)
 	var texts := VBoxContainer.new()

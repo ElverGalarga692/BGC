@@ -90,7 +90,9 @@ games/conjura/
     conjura_deduction.gd Deducción: probabilidad de que cada uno sea traidor
     conjura_ai.gd        IA (solo usa view_for: no hace trampa); miente y deduce
   view/
+    conjura_art.gd       Ilustraciones por código: cartas de edicto y de rol
     conjura_board.gd     Tablero público: pistas, descontento, crisis, mazo
+    vote_reveal.gd       Revelación animada de cada votación
     conjura_screen.gd    Pantalla: jugadores, registro, acciones y ventana
                          privada con cortina de «Pasa el dispositivo»
 tests/                   Tests sin dependencias externas (test_*.gd)
@@ -181,7 +183,8 @@ Los efectos se sintetizan al arrancar (`core/sfx.gd`), así que no hay
 archivos de audio. Para sustituir uno por una grabación, pon un `.wav` u
 `.ogg` con su nombre en `res://assets/sfx/` (por ejemplo `dice.wav`).
 Nombres: `dice`, `build`, `resource`, `card`, `robber`, `turn`, `trade`,
-`win`, `error`, `click`.
+`win`, `error`, `click`, y los de La Conjura: `approve`, `reject`, `seal`,
+`gong`, `whisper`, `crisis`, `win_sombra`.
 
 ### Partidas guardadas
 
@@ -238,4 +241,9 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       límite lo pone cada juego), votos simultáneos, ventana privada por
       asiento y una IA ocupa el sitio de quien se desconecta. Probado con un
       anfitrión y dos clientes: todos terminan con el mismo historial.
-- [ ] **La Conjura, fase 5: pulido.** Arte, sonido e historial final.
+- [x] **La Conjura, fase 5: pulido.** Cartas de edicto y de rol dibujadas
+      por código, votos que se revelan carta a carta, rótulos al promulgar,
+      sonidos propios (sello, gong, redoble, susurro, victorias) y pantalla
+      final con las cartas de rol y el historial de gobiernos, que compara
+      lo que dijo cada uno con lo que pasó de verdad y marca las mentiras.
+- [ ] **Siguiente juego** de la colección.

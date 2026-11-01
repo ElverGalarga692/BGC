@@ -84,6 +84,10 @@ var knowledge: Array = []
 ## Historial público de gobiernos: {regent, nominee, votes, approved, edict}.
 var governments: Array[Dictionary] = []
 
+## Lo que de verdad pasó en cada legislatura (índice de gobierno ->
+## {"drawn", "passed"}). Secreto hasta que termina la partida.
+var truth := {}
+
 var winner_faction := -1
 var win_reason := ""
 
@@ -240,6 +244,8 @@ func view_for(seat: int) -> Dictionary:
 		"winner_faction": winner_faction,
 		"win_reason": win_reason,
 	}
+	if finished:
+		view["truth"] = truth.duplicate(true)
 	if seat >= 0 and seat < players.size():
 		view["knowledge"] = knowledge[seat].duplicate(true)
 		if votes.has(seat):
@@ -398,6 +404,7 @@ func _apply(action: GameAction) -> void:
 			hand.remove_at(index)
 			knowledge[council].append({"kind": "received", "cards": hand.duplicate(), "regent": regent, "round": governments.size() - 1})
 			knowledge[regent][-1]["passed"] = hand.duplicate()
+			truth[governments.size() - 1]["passed"] = hand.duplicate()
 			phase = Phase.COUNCIL_ENACT
 			event.emit(&"regent_discarded", {"regent": regent})
 		ENACT:
@@ -466,6 +473,7 @@ func _resolve_vote() -> void:
 		hand.append(draw_pile.pop_front())
 	regent_discarded = -1
 	knowledge[regent].append({"kind": "drawn", "cards": hand.duplicate(), "council": council, "round": governments.size() - 1})
+	truth[governments.size() - 1] = {"drawn": hand.duplicate()}
 	phase = Phase.REGENT_DISCARD
 
 

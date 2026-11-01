@@ -30,6 +30,14 @@ func _ready() -> void:
 		&"win": _tone([523.25, 659.25, 783.99, 1046.5], 0.16, 0.3, 0.5),
 		&"error": _buzz(),
 		&"click": _tone([1800.0], 0.025, 0.12),
+		# La Conjura.
+		&"approve": _tone([659.25, 987.77], 0.1, 0.22),
+		&"reject": _tone([392.0, 293.66], 0.13, 0.22),
+		&"seal": _seal(),
+		&"gong": _gong(),
+		&"whisper": _whisper(),
+		&"crisis": _drum_roll(),
+		&"win_sombra": _tone([440.0, 523.25, 659.25, 622.25, 440.0], 0.17, 0.26, 0.6),
 	}
 	for sound in _streams.keys():
 		for ext in ["wav", "ogg"]:
@@ -170,4 +178,67 @@ func _buzz() -> AudioStreamWAV:
 		var t := float(i) / RATE
 		var square := 1.0 if fmod(t * 140.0, 1.0) < 0.5 else -1.0
 		s[i] = 0.18 * square * (1.0 - t / 0.16)
+	return _to_stream(s)
+
+
+## Sello de lacre: golpe sordo con un tono grave.
+func _seal() -> AudioStreamWAV:
+	var s := _buffer(0.4)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var last := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		last = last * 0.85 + rng.randf_range(-1.0, 1.0) * 0.15
+		var thump := sin(TAU * (95.0 - 40.0 * t) * t) * exp(-t * 14.0)
+		s[i] = 0.55 * thump + 0.5 * last * exp(-t * 60.0) + 0.12 * sin(TAU * 196.0 * t) * exp(-t * 6.0)
+	return _to_stream(s)
+
+
+## Gong grave (destierro).
+func _gong() -> AudioStreamWAV:
+	var s := _buffer(1.8)
+	for i in s.size():
+		var t := float(i) / RATE
+		var env := exp(-t * 2.2) * minf(1.0, t * 200.0)
+		var wobble := 1.0 + 0.004 * sin(TAU * 5.0 * t)
+		s[i] = 0.3 * env * (sin(TAU * 98.0 * wobble * t) + 0.6 * sin(TAU * 147.0 * t) + 0.35 * sin(TAU * 233.0 * t) + 0.2 * sin(TAU * 311.0 * t))
+	return _to_stream(s)
+
+
+## Susurro: ruido suave que sube y baja (secretos y poderes).
+func _whisper() -> AudioStreamWAV:
+	var s := _buffer(0.6)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 13
+	var a := 0.0
+	var b := 0.0
+	for i in s.size():
+		var t := float(i) / RATE
+		a = a * 0.5 + rng.randf_range(-1.0, 1.0) * 0.5
+		b = b * 0.9 + a * 0.1
+		var env := sin(PI * t / 0.6) * (0.6 + 0.4 * sin(TAU * 7.0 * t))
+		s[i] = 0.35 * env * (a - b)
+	return _to_stream(s)
+
+
+## Redoble de tambor (crisis).
+func _drum_roll() -> AudioStreamWAV:
+	var s := _buffer(1.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 17
+	var hit := 0.0
+	while hit < 0.85:
+		var start := int(hit * RATE)
+		var amp := 0.2 + 0.35 * hit
+		for i in int(0.05 * RATE):
+			if start + i >= s.size():
+				break
+			var t := float(i) / RATE
+			s[start + i] += amp * exp(-t * 70.0) * (rng.randf_range(-1.0, 1.0) * 0.6 + sin(TAU * 160.0 * t))
+		hit += 0.045
+	var boom := int(0.85 * RATE)
+	for i in s.size() - boom:
+		var t := float(i) / RATE
+		s[boom + i] += 0.6 * sin(TAU * (80.0 - 30.0 * t) * t) * exp(-t * 12.0)
 	return _to_stream(s)
