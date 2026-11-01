@@ -280,31 +280,59 @@ func test_victory() -> void:
 ## Jugadores aleatorios juegan partidas completas: nunca debe haber errores,
 ## las cartas se conservan y alguien termina ganando.
 func test_random_playouts() -> void:
-	for seed in [1, 2, 3]:
+	for seed in [1, 2, 3, 4, 5]:
 		var game := _new_game(4, seed)
 		var chooser := BGCRng.new(seed * 31)
 		var steps := 0
+		var sevens := [0]  # array: las lambdas capturan las variables por valor
+		var devs_played := 0
+		game.event.connect(func(kind: StringName, _d: Dictionary) -> void:
+			if kind == &"seven":
+				sevens[0] += 1)
 		while not game.finished and steps < 20000:
-			var actions := game.get_legal_actions(game.turns.current)
-			assert_false(actions.is_empty(), "siempre hay alguna acción legal")
-			var builds := actions.filter(func(a: GameAction) -> bool: return a.type in [ArchipelagoGame.BUILD_CITY, ArchipelagoGame.BUILD_SETTLEMENT, ArchipelagoGame.BUILD_ROAD])
+			var actor: int = game.players_to_act()[0]
+			var actions := game.get_legal_actions(actor)
+			assert_false(actions.is_empty(), "siempre hay alguna acción legal (fase %d)" % game.phase)
+			if actions.is_empty():
+				return
+			var preferred := actions.filter(func(a: GameAction) -> bool:
+				return a.type in [ArchipelagoGame.BUILD_CITY, ArchipelagoGame.BUILD_SETTLEMENT, ArchipelagoGame.BUILD_ROAD, ArchipelagoGame.PLAY_DEV, ArchipelagoGame.BUY_DEV])
 			var trades := actions.filter(func(a: GameAction) -> bool: return a.type == ArchipelagoGame.TRADE_BANK)
 			var action: GameAction
-			if not builds.is_empty():
-				action = chooser.pick(builds)
+			if not preferred.is_empty() and game.phase != ArchipelagoGame.Phase.ROLL:
+				action = chooser.pick(preferred)
 			elif not trades.is_empty() and chooser.randf() < 0.5:
 				action = chooser.pick(trades)
+			elif game.phase == ArchipelagoGame.Phase.ROLL:
+				action = actions[0]
 			else:
-				action = actions[0] if actions.size() == 1 else actions.back()
+				action = chooser.pick(actions)
+			if action.type == ArchipelagoGame.PLAY_DEV:
+				devs_played += 1
 			var error := game.submit(action)
 			if error != "":
 				assert_eq(error, "", "acción legal rechazada: %s" % action)
 				return
 			steps += 1
+			_check_invariants(game)
 		assert_true(game.finished, "semilla %d: la partida termina (%d pasos)" % [seed, steps])
 		assert_true(game.victory_points(game.winner_ids[0]) >= 10)
+		assert_true(sevens[0] > 0, "han salido sietes")
+		assert_true(devs_played > 0, "se han jugado cartas de desarrollo")
+
+
+func _check_invariants(game: ArchipelagoGame) -> void:
+	for r in 5:
+		var total := _total_cards(game, r)
+		if total != ArchipelagoGame.BANK_STOCK:
+			assert_eq(total, ArchipelagoGame.BANK_STOCK, "se conservan las cartas de %s" % ArchDefs.RESOURCE_NAMES[r])
+	for p in game.players.size():
 		for r in 5:
-			assert_eq(_total_cards(game, r), ArchipelagoGame.BANK_STOCK, "se conservan las cartas de %s" % ArchDefs.RESOURCE_NAMES[r])
-		for p in 4:
-			for r in 5:
-				assert_true(game.hands[p][r] >= 0)
+			if game.hands[p][r] < 0:
+				assert_true(false, "mano negativa")
+	var devs := game.dev_deck.size()
+	for p in game.players.size():
+		devs += game.dev_hand_size(p) + game.militia_played[p]
+	# Las cartas jugadas que no son Milicianos se descartan; nunca hay más
+	# cartas de las que tiene el mazo.
+	assert_true(devs <= 25)

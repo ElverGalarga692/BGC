@@ -68,6 +68,34 @@ const PORT_TYPES := [
 
 const BOARD_RADIUS := 2
 
+## Cartas de desarrollo.
+enum DevCard { MILITIA, MONUMENT, ROAD_BUILDING, HARVEST, MONOPOLY }
+
+const DEV_NAMES := {
+	DevCard.MILITIA: "Miliciano",
+	DevCard.MONUMENT: "Monumento",
+	DevCard.ROAD_BUILDING: "Ingenieros",
+	DevCard.HARVEST: "Cosecha abundante",
+	DevCard.MONOPOLY: "Monopolio",
+}
+
+const DEV_DESCRIPTIONS := {
+	DevCard.MILITIA: "Mueve el bandido y roba una carta. Cuenta para la Mayor milicia.",
+	DevCard.MONUMENT: "1 punto de victoria (oculto para los demás).",
+	DevCard.ROAD_BUILDING: "Construye 2 caminos gratis.",
+	DevCard.HARVEST: "Toma 2 recursos cualesquiera de la banca.",
+	DevCard.MONOPOLY: "Elige un recurso: todos los jugadores te dan todas sus cartas de ese recurso.",
+}
+
+## Cartas de cada tipo en el mazo.
+const DEV_DECK := {
+	DevCard.MILITIA: 14,
+	DevCard.MONUMENT: 5,
+	DevCard.ROAD_BUILDING: 2,
+	DevCard.HARVEST: 2,
+	DevCard.MONOPOLY: 2,
+}
+
 
 ## Lista de terrenos (sin barajar) para el tablero estándar.
 static func terrain_pool() -> Array[int]:
@@ -76,6 +104,15 @@ static func terrain_pool() -> Array[int]:
 		for i in TERRAIN_COUNTS[terrain]:
 			pool.append(terrain)
 	return pool
+
+
+## Mazo de cartas de desarrollo (sin barajar).
+static func dev_deck() -> Array[int]:
+	var deck: Array[int] = []
+	for card in DEV_DECK:
+		for i in DEV_DECK[card]:
+			deck.append(card)
+	return deck
 
 
 ## Número de combinaciones de 2d6 que suman `n` (los "puntos" de la ficha).

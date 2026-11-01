@@ -80,9 +80,9 @@ tablero y reutilizar esa misma detección.
       producción, construir caminos, poblados y ciudades, comercio con la
       banca y los puertos, puntos de victoria (10). Interfaz para jugar en
       local por turnos.
-- [ ] **Fase 3: reglas completas.** El 7 (descartes y bandido), cartas de
-      desarrollo, ejército más grande, camino más largo, comercio entre
-      jugadores.
+- [x] **Fase 3: reglas completas.** El 7 (descartes y bandido), cartas de
+      desarrollo (Miliciano, Monumento, Ingenieros, Cosecha abundante,
+      Monopolio), Mayor milicia, Camino más largo y comercio entre jugadores.
 - [ ] **Fase 4: IA.** Jugador aleatorio y luego por heurísticas.
 - [ ] **Fase 5: pulido.** Animaciones, sonido, guardar y cargar, tutorial.
 - [ ] **Siguiente juego** de la colección.

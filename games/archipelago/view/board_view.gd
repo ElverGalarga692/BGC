@@ -125,6 +125,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _pick_target(p: Vector2) -> Array:
+	if _target_kind == Pick.TILE:
+		var t := board.grid.tile_at(p)
+		return [Pick.TILE, t] if t in _target_ids else [Pick.NONE, -1]
 	var best := -1
 	var best_d := 0.5
 	for id in _target_ids:
@@ -214,9 +217,11 @@ func _draw_targets() -> void:
 				draw_line(a + shrink, b - shrink, backing, hex_size * 0.14, true)
 				draw_line(a + shrink, b - shrink, color, hex_size * 0.07, true)
 			Pick.TILE:
-				var c := board.grid.tile_center(id) * hex_size
-				draw_circle(c, hex_size * 0.16, backing)
-				draw_arc(c, hex_size * 0.13, 0, TAU, 24, color, hex_size * 0.05, true)
+				# Borde interior del hexágono, para no tapar el número.
+				var corners := HexCoords.corners(board.grid.tile_center(id) * hex_size, hex_size * 0.86)
+				corners.append(corners[0])
+				draw_polyline(corners, backing, hex_size * 0.1, true)
+				draw_polyline(corners, color, hex_size * 0.05, true)
 
 
 func _draw_sea() -> void:
