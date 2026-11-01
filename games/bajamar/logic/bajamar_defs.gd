@@ -5,8 +5,8 @@ extends RefCounted
 ## Las cartas son enteros (así se guardan y se envían por red sin más):
 ##   pez       especie * 10 + valor   (especie 0..4, valor 1..6 → 1..46)
 ##   tormenta  STORM
-## Las cartas especiales (Gaviota, Red reforzada, Marea alta) llegan en la
-## fase 2 y usarán los números a partir de SPECIAL_BASE.
+##   especial  GULL, SHIELD, HIGH_TIDE
+## (ver BajamarGame para lo que hace cada especial).
 
 enum Species { SARDINE, MACKEREL, OCTOPUS, HAKE, TUNA }
 
@@ -33,7 +33,15 @@ const FISH_COPIES := 2
 const STORM_COUNT := 8
 
 const STORM := 100
-const SPECIAL_BASE := 101
+## Gaviota: robas el último pez de la red de otro jugador.
+const GULL := 101
+## Red reforzada: te salva de la tormenta que te rompería la red.
+const SHIELD := 102
+## Marea alta: todos los que siguen en el mar roban a ciegas.
+const HIGH_TIDE := 103
+
+const SPECIAL_COUNTS := {GULL: 3, SHIELD: 3, HIGH_TIDE: 2}
+const SPECIAL_NAMES := {GULL: "Gaviota", SHIELD: "Red reforzada", HIGH_TIDE: "Marea alta"}
 
 ## Cartas boca arriba en el mercado.
 const MARKET_SIZE := 3
@@ -62,6 +70,10 @@ static func is_storm(card: int) -> bool:
 	return card == STORM
 
 
+static func is_special(card: int) -> bool:
+	return SPECIAL_COUNTS.has(card)
+
+
 static func species_of(card: int) -> int:
 	return card / 10 if is_fish(card) else -1
 
@@ -73,6 +85,8 @@ static func value_of(card: int) -> int:
 static func card_name(card: int) -> String:
 	if is_storm(card):
 		return "Tormenta"
+	if is_special(card):
+		return SPECIAL_NAMES[card]
 	if is_fish(card):
 		return "%s %d" % [SPECIES_NAMES[species_of(card)], value_of(card)]
 	return "Carta %d" % card
@@ -87,6 +101,9 @@ static func deck() -> Array[int]:
 				cards.append(fish(s, v))
 	for i in STORM_COUNT:
 		cards.append(STORM)
+	for card in SPECIAL_COUNTS:
+		for i in SPECIAL_COUNTS[card]:
+			cards.append(card)
 	return cards
 
 

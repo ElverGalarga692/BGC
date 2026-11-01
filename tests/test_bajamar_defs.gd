@@ -16,11 +16,22 @@ func test_card_encoding() -> void:
 	assert_false(D.is_fish(0))
 	assert_false(D.is_fish(7))  # especie 0, valor 7: no existe
 	assert_eq(D.card_name(D.fish(D.Species.OCTOPUS, 4)), "Pulpo 4")
+	for c in [D.GULL, D.SHIELD, D.HIGH_TIDE]:
+		assert_true(D.is_special(c))
+		assert_false(D.is_fish(c))
+	assert_eq(D.card_name(D.GULL), "Gaviota")
+
+
+func test_specials_do_not_score() -> void:
+	assert_eq(D.score([D.GULL, D.SHIELD, D.fish(0, 2)])["total"], 4)
 
 
 func test_deck_composition() -> void:
 	var deck := D.deck()
-	assert_eq(deck.size(), D.SPECIES_COUNT * 6 * D.FISH_COPIES + D.STORM_COUNT)
+	assert_eq(deck.size(), D.SPECIES_COUNT * 6 * D.FISH_COPIES + D.STORM_COUNT + 8)
+	assert_eq(deck.count(D.GULL), 3)
+	assert_eq(deck.count(D.SHIELD), 3)
+	assert_eq(deck.count(D.HIGH_TIDE), 2)
 	assert_eq(deck.count(D.STORM), D.STORM_COUNT)
 	assert_eq(deck.count(D.fish(D.Species.TUNA, 6)), D.FISH_COPIES)
 

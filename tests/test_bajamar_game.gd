@@ -26,7 +26,9 @@ func _rig(g: BajamarGame, cards: Array) -> void:
 
 
 func _do(g: BajamarGame, type: StringName, data: Dictionary = {}, pid: int = -1) -> String:
-	return g.submit(GameAction.new(type, g.turns.current if pid < 0 else pid, data))
+	if pid < 0:
+		pid = g.players_to_act()[0] if not g.players_to_act().is_empty() else g.turns.current
+	return g.submit(GameAction.new(type, pid, data))
 
 
 ## Juega hasta el final con una estrategia sencilla: roba a ciegas hasta
@@ -34,9 +36,11 @@ func _do(g: BajamarGame, type: StringName, data: Dictionary = {}, pid: int = -1)
 func _autoplay(g: BajamarGame, stop_at: int = 4, max_actions: int = 5000) -> void:
 	var count := 0
 	while not g.finished and count < max_actions:
-		var p := g.turns.current
+		var p := g.players_to_act()[0]
 		var error := ""
-		if g.warnings[p] or g.net(p).size() >= stop_at or g.cards_left() == 0:
+		if not g.pending_gulls.is_empty():
+			error = _do(g, G.CHOOSE_TARGET, {"target": g.gull_targets(p)[0]})
+		elif g.warnings[p] or g.net(p).size() >= stop_at or g.cards_left() == 0:
 			error = _do(g, G.GO_TO_PORT)
 		elif not g.market.is_empty() and count % 3 == 0:
 			error = _do(g, G.TAKE_MARKET, {"slot": count % g.market.size()})
@@ -51,7 +55,7 @@ func _autoplay(g: BajamarGame, stop_at: int = 4, max_actions: int = 5000) -> voi
 func _total_cards(g: BajamarGame) -> int:
 	var total := g.deck.size() + g.discard.size() + g.market.size()
 	for p in g.players.size():
-		total += g.net(p).size() + (1 if g.warnings[p] else 0)
+		total += g.net(p).size() + (1 if g.warnings[p] else 0) + (1 if g.shields[p] else 0)
 	return total
 
 
@@ -81,7 +85,10 @@ func test_save_and_replay() -> void:
 	for i in 25:
 		if a.finished:
 			break
-		_do(a, G.DRAW_BLIND if i % 4 != 3 else G.GO_TO_PORT)
+		if not a.pending_gulls.is_empty():
+			_do(a, G.CHOOSE_TARGET, {"target": a.gull_targets(a.players_to_act()[0])[0]})
+		else:
+			_do(a, G.DRAW_BLIND if i % 4 != 3 else G.GO_TO_PORT)
 	var data := a.save_data()
 	var b := BajamarGame.new()
 	b.setup(GameBase.players_from_save(data), int(data["seed"]))
@@ -98,6 +105,7 @@ func test_only_current_player_acts() -> void:
 	assert_eq(_do(g, G.DRAW_BLIND, {}, 1), "No es tu turno")
 	assert_eq(_do(g, G.TAKE_MARKET, {"slot": 5}), "Esa carta del mercado no existe")
 	assert_eq(_do(g, &"fly"), "Acción no soportada: fly")
+	_rig(g, [D.fish(0, 1)])
 	assert_eq(_do(g, G.DRAW_BLIND), "")
 	assert_eq(g.turns.current, 1)
 
@@ -162,6 +170,7 @@ func test_first_storm_warns_second_breaks() -> void:
 
 func test_turn_skips_players_out_of_the_sea() -> void:
 	var g := _game(3)
+	_rig(g, [D.fish(0, 1), D.fish(0, 2), D.fish(0, 3)])
 	_do(g, G.DRAW_BLIND)       # 0
 	_do(g, G.GO_TO_PORT)       # 1 vuelve a puerto
 	_do(g, G.DRAW_BLIND)       # 2
@@ -215,8 +224,8 @@ func test_warning_storm_discarded_at_round_end() -> void:
 
 func test_reshuffle_when_deck_runs_out() -> void:
 	var g := _game(2)
-	g.discard.assign(g.deck.slice(0, 5))
-	g.deck.assign(g.deck.slice(5, 6))
+	g.discard.assign([D.fish(0, 1), D.fish(0, 2), D.fish(0, 3), D.fish(0, 4), D.fish(0, 5)])
+	g.deck.assign([D.fish(1, 1)])
 	_do(g, G.DRAW_BLIND)  # roba la última
 	assert_true(g.deck.is_empty())
 	_do(g, G.DRAW_BLIND)  # baraja los descartes

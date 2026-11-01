@@ -124,7 +124,7 @@ games/bajamar/           Bajamar (en desarrollo: aún no está en el menú)
   logic/
     bajamar_defs.gd      Cartas (enteros), mazo y puntuación de una red
     bajamar_game.gd      La partida (GameBase): rondas, mercado, tormentas,
-                         volver a puerto, puntos y fin de partida
+                         especiales, volver a puerto, puntos y fin de partida
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -282,8 +282,11 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       puntuación con especie doble y escaleras, rondas hasta 150 puntos;
       mazo que se rebaraja y riesgo calculable con información pública
       (`storm_chance()`). Tests de reglas, determinismo y guardado.
-- [ ] **Bajamar, fase 2: especiales.** Gaviota (robar el último pez de otro
-      jugador), Red reforzada (anula una tormenta) y Marea alta (todos roban).
+- [x] **Bajamar, fase 2: especiales.** Gaviota (quita el último pez a otro
+      jugador, también en puerto; se elige víctima con `choose_target` y el
+      turno espera), Red reforzada (salva de la tormenta que rompería la red)
+      y Marea alta (todos los que siguen en el mar roban; sin cadenas). Mazo
+      de 76 cartas.
 - [ ] **Bajamar, fase 3: IA.** Fácil (umbral fijo), normal (valor esperado
       con el riesgo de tormenta) y difícil (mercado, escaleras, marcador y
       Gaviota); ajustada con torneos.

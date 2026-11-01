@@ -4,6 +4,7 @@ Sales a pescar con tu barca. Cuanto más tiempo te quedes en el mar, más peces 
 [font_size=20][b]Las cartas[/b][/font_size]
 • [b]Peces:[/b] cinco especies (Sardina, Caballa, Pulpo, Merluza y Atún) con valores del 1 al 6. Hay dos cartas de cada.
 • [b]Tormentas:[/b] hay 8.
+• [b]Especiales:[/b] 3 Gaviotas, 3 Redes reforzadas y 2 Mareas altas (ver más abajo).
 
 [font_size=20][b]El mercado[/b][/font_size]
 En el centro hay siempre [b]3 cartas boca arriba[/b]. Cuando alguien coge una, se repone con la de arriba del mazo. [b]En el mercado nunca hay tormentas:[/b] si al reponerlo sale una, pasa de largo (va a los descartes, a la vista de todos) y se saca otra carta.
@@ -18,8 +19,14 @@ Todos empiezan en el mar con la red vacía. Por turnos, cada jugador que sigue e
 • La [b]primera[/b] tormenta que te sale es un aviso: se queda delante de ti y sigues jugando.
 • Con la [b]segunda[/b] se te rompe la red: pierdes todo lo pescado y esta ronda no puntúas.
 
+[font_size=20][b]Las cartas especiales[/b][/font_size]
+Funcionan igual si las robas a ciegas que si las coges del mercado.
+• [b]Gaviota:[/b] elige a otro jugador con peces en la red (en el mar o en puerto, pero no con la red rota) y quítale el [b]último pez[/b] que pescó; pasa a tu red. Si nadie tiene peces, la gaviota se va sin nada.
+• [b]Red reforzada:[/b] se queda delante de ti y te salva de la tormenta que te rompería la red (las dos se descartan y el aviso sigue). Solo puedes tener una; si te sale otra, se descarta.
+• [b]Marea alta:[/b] todos los que siguen en el mar roban una carta a ciegas, empezando por ti y en orden de turno. ¡Las tormentas también cuentan! Si con la marea sale otra Marea alta, no tiene efecto. Las gaviotas que salgan se juegan después, en el mismo orden.
+
 [font_size=20][b]Fin de la ronda y puntos[/b][/font_size]
-La ronda termina cuando ya no queda nadie en el mar. Cada red que volvió a puerto puntúa:
+La ronda termina cuando ya no queda nadie en el mar. Cada red que volvió a puerto puntúa (las cartas especiales no dan puntos):
 • La [b]suma[/b] de los valores de sus peces.
 • La especie de la que tengas [b]más cartas vale doble[/b] (solo una; si empatan, la que más suma).
 • [b]Escaleras:[/b] si tienes tres o más valores seguidos (de cualquier especie), ganas [b]5 puntos por cada carta a partir de la tercera[/b]: 1-2-3 da 5, 1-2-3-4 da 10 y la escalera completa del 1 al 6 da 20. Los valores repetidos solo cuentan una vez.

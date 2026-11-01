@@ -14,6 +14,22 @@ extends GameBase
 ## pasa de largo (va a los descartes, a la vista de todos) y se repone otra
 ## vez.
 ##
+## Cartas especiales (pueden salir del mazo o cogerse del mercado):
+##   Gaviota        quien la recibe elige a otro jugador con peces en la red
+##                  (en el mar o en puerto, no con la red rota) y le quita el
+##                  último pez que pescó (CHOOSE_TARGET). Si nadie tiene
+##                  peces, se descarta sin efecto.
+##   Red reforzada  se queda delante del jugador (como mucho una; otra más se
+##                  descarta) y le salva de la tormenta que le rompería la
+##                  red: las dos cartas se descartan y el aviso sigue.
+##   Marea alta     todos los que siguen en el mar roban una carta a ciegas,
+##                  empezando por quien la recibió y en orden de turno. Las
+##                  tormentas cuentan; otra Marea alta robada así no tiene
+##                  efecto. Las gaviotas robadas se resuelven después, en el
+##                  mismo orden.
+## Mientras haya gaviotas por resolver, solo puede actuar quien la tiene, y
+## el turno no pasa hasta que se resuelven todas.
+##
 ## La ronda termina cuando ya nadie está en el mar. Cada red que volvió a
 ## puerto puntúa (BajamarDefs.score). Si alguien llega a TARGET_SCORE, gana
 ## quien más puntos tenga (puede haber empate); si no, empieza otra ronda con
@@ -33,10 +49,9 @@ enum Phase { FISHING, FINISHED }
 enum Status { AT_SEA, IN_PORT, BROKEN }
 
 const DRAW_BLIND := &"draw_blind"
-const TAKE_MARKET := &"take_market"  # {"slot": int}
+const TAKE_MARKET := &"take_market"      # {"slot": int}
 const GO_TO_PORT := &"go_to_port"
-
-const ACTIONS := [DRAW_BLIND, TAKE_MARKET, GO_TO_PORT]
+const CHOOSE_TARGET := &"choose_target"  # Gaviota: {"target": pid}
 
 var phase: Phase = Phase.FISHING
 ## Puntos para ganar. Se puede cambiar antes de jugar (tests, opciones).
@@ -51,11 +66,15 @@ var discard: Array[int] = []
 var market: Array[int] = []
 
 ## Por jugador: cartas de su red esta ronda, si tiene una tormenta de aviso,
-## su situación y su puntuación total.
+## si tiene una red reforzada, su situación y su puntuación total.
 var nets: Array = []
 var warnings: Array[bool] = []
+var shields: Array[bool] = []
 var status: Array[int] = []
 var scores: Array[int] = []
+## Jugadores con una gaviota por resolver, en orden (la carta ya está en los
+## descartes).
+var pending_gulls: Array[int] = []
 ## Puntos de la última ronda terminada, por jugador (desglose de
 ## BajamarDefs.score, o {"total": 0, "broken": true}).
 var last_round: Array = []
@@ -73,8 +92,10 @@ func _on_setup() -> void:
 	for p in players.size():
 		nets.append([] as Array[int])
 	warnings.assign(_filled(players.size(), false))
+	shields.assign(_filled(players.size(), false))
 	status.assign(_filled(players.size(), Status.AT_SEA))
 	scores.assign(_filled(players.size(), 0))
+	pending_gulls.clear()
 	last_round.clear()
 	_start_round()
 
@@ -83,8 +104,9 @@ func _on_setup() -> void:
 
 func players_to_act() -> Array[int]:
 	var result: Array[int] = []
-	if phase != Phase.FINISHED:
-		result.append(turns.current)
+	if phase == Phase.FINISHED:
+		return result
+	result.append(pending_gulls[0] if not pending_gulls.is_empty() else turns.current)
 	return result
 
 
@@ -103,6 +125,15 @@ func net(pid: int) -> Array[int]:
 ## Puntos que se llevaría ahora mismo si volviera a puerto.
 func net_score(pid: int) -> Dictionary:
 	return D.score(nets[pid])
+
+
+## Jugadores a los que `pid` puede quitar un pez con la Gaviota.
+func gull_targets(pid: int) -> Array[int]:
+	var result: Array[int] = []
+	for p in players.size():
+		if p != pid and status[p] != Status.BROKEN and not nets[p].is_empty():
+			result.append(p)
+	return result
 
 
 ## Cartas que se pueden robar a ciegas (mazo más descartes por barajar).
@@ -140,6 +171,8 @@ func validate(action: GameAction) -> String:
 		return "Jugador no válido"
 	if not pid in players_to_act():
 		return "No es tu turno"
+	if not pending_gulls.is_empty() and action.type != CHOOSE_TARGET:
+		return "Primero elige a quién le quita un pez la gaviota"
 	match action.type:
 		DRAW_BLIND:
 			if cards_left() == 0:
@@ -151,6 +184,12 @@ func validate(action: GameAction) -> String:
 				return "Esa carta del mercado no existe"
 			return ""
 		GO_TO_PORT:
+			return ""
+		CHOOSE_TARGET:
+			if pending_gulls.is_empty():
+				return "No hay ninguna gaviota por resolver"
+			if not int(action.data.get("target", -1)) in gull_targets(pid):
+				return "La gaviota no puede quitarle un pez a ese jugador"
 			return ""
 	return "Acción no soportada: %s" % action.type
 
@@ -169,12 +208,24 @@ func _apply(action: GameAction) -> void:
 		GO_TO_PORT:
 			status[pid] = Status.IN_PORT
 			event.emit(&"port", {"player": pid, "score": net_score(pid)})
-	_advance()
+		CHOOSE_TARGET:
+			pending_gulls.pop_front()
+			var target := int(action.data["target"])
+			var fish: int = nets[target].pop_back()
+			nets[pid].append(fish)
+			event.emit(&"gull", {"player": pid, "target": target, "card": fish})
+	_resolve_gulls()
+	if pending_gulls.is_empty():
+		_advance()
 
 
 func get_legal_actions(player_id: int) -> Array[GameAction]:
 	var result: Array[GameAction] = []
 	if not player_id in players_to_act():
+		return result
+	if not pending_gulls.is_empty():
+		for t in gull_targets(player_id):
+			result.append(GameAction.new(CHOOSE_TARGET, player_id, {"target": t}))
 		return result
 	if cards_left() > 0:
 		result.append(GameAction.new(DRAW_BLIND, player_id))
@@ -186,24 +237,73 @@ func get_legal_actions(player_id: int) -> Array[GameAction]:
 
 # --- Internos -------------------------------------------------------------------
 
-## Un jugador recibe una carta en su red (o una tormenta).
-func _receive(pid: int, card: int, from: String) -> void:
+## Un jugador recibe una carta. `tide` indica que la roba por una Marea alta.
+func _receive(pid: int, card: int, from: String, tide: bool = false) -> void:
 	event.emit(&"draw", {"player": pid, "card": card, "from": from})
-	if not D.is_storm(card):
+	if D.is_fish(card):
 		nets[pid].append(card)
-		return
+	elif D.is_storm(card):
+		_storm(pid)
+	elif card == D.GULL:
+		discard.append(card)
+		pending_gulls.append(pid)
+	elif card == D.SHIELD:
+		if shields[pid]:
+			discard.append(card)
+			event.emit(&"shield_wasted", {"player": pid})
+		else:
+			shields[pid] = true
+			event.emit(&"shield", {"player": pid})
+	elif card == D.HIGH_TIDE:
+		discard.append(card)
+		if tide:
+			event.emit(&"tide_wasted", {"player": pid})
+		else:
+			_high_tide(pid)
+
+
+func _storm(pid: int) -> void:
 	if not warnings[pid]:
 		warnings[pid] = true
 		event.emit(&"warning", {"player": pid})
+		return
+	if shields[pid]:
+		shields[pid] = false
+		discard.append(D.SHIELD)
+		discard.append(D.STORM)
+		event.emit(&"shield_used", {"player": pid})
 		return
 	# Segunda tormenta: se rompe la red.
 	status[pid] = Status.BROKEN
 	discard.append_array(nets[pid])
 	discard.append(D.STORM)  # la de aviso
-	discard.append(card)
+	discard.append(D.STORM)
 	nets[pid] = [] as Array[int]
 	warnings[pid] = false
 	event.emit(&"net_broken", {"player": pid})
+
+
+## Marea alta: cada jugador que sigue en el mar roba una carta, empezando
+## por `pid`.
+func _high_tide(pid: int) -> void:
+	event.emit(&"tide", {"player": pid})
+	var n := players.size()
+	for step in n:
+		var p := (pid + step) % n
+		if status[p] != Status.AT_SEA or cards_left() == 0:
+			continue
+		_receive(p, _draw(), "tide", true)
+
+
+## Descarta las gaviotas que ya no pueden quitar nada (sin víctimas, o con la
+## red de quien la tiene rota).
+func _resolve_gulls() -> void:
+	while not pending_gulls.is_empty():
+		var p := pending_gulls[0]
+		if status[p] != Status.BROKEN and not gull_targets(p).is_empty():
+			return
+		pending_gulls.pop_front()
+		event.emit(&"gull_wasted", {"player": p})
 
 
 ## Roba la carta de arriba del mazo; si está vacío, baraja los descartes.
@@ -245,6 +345,7 @@ func _start_round() -> void:
 	for p in n:
 		nets[p] = [] as Array[int]
 		warnings[p] = false
+		shields[p] = false
 		status[p] = Status.AT_SEA
 	_refill_market()
 	turns.current = (start_player + round_number - 1) % n
@@ -264,8 +365,11 @@ func _end_round() -> void:
 		discard.append_array(nets[p])
 		if warnings[p]:
 			discard.append(D.STORM)
+		if shields[p]:
+			discard.append(D.SHIELD)
 		nets[p] = [] as Array[int]
 		warnings[p] = false
+		shields[p] = false
 	event.emit(&"round_end", {"round": round_number, "results": last_round.duplicate(true)})
 	var best: int = scores.max()
 	if best >= target_score:
