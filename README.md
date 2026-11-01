@@ -300,7 +300,10 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       especie mayoritaria da +2 por carta en vez de valer doble, 10
       tormentas y los descartes se barajan al empezar cada ronda. Con IAs
       normales una partida a 4 dura ~7 rondas (~16 puntos por ronda, máximo
-      ~80); la normal gana ~57 % contra tres fáciles.
+      ~80); la normal gana ~57 % contra tres fáciles. Pendiente: la difícil
+      todavía empata con la normal (49 % en 500 duelos), porque maximizar
+      los puntos esperados de cada ronda ya es casi lo mejor que se puede
+      hacer; solo gana algo en la última ronda.
 - [ ] **Bajamar, fase 4: pantalla.** Mesa 2D con redes, mercado y mazo,
       volteo de cartas y sonidos; el juego aparece en el menú.
 - [ ] **Bajamar, fase 5: red local y pulido.** Resumen de cada ronda,
