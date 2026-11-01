@@ -55,6 +55,8 @@ var _camera: Camera3D
 var _board_root: Node3D
 var _pieces_root: Node3D
 var _markers_root: Node3D
+## Efectos pasajeros (anillos de producción), aparte de los marcadores.
+var _fx_root: Node3D
 var _hover_marker: Node3D
 var _bandit: Node3D
 var _bandit_tile := -1
@@ -71,6 +73,8 @@ var _zoom := 1.0
 var _dragging := false
 
 var _materials := {}
+## Ficha numérica de cada casilla (para animarla al producir).
+var _tokens := {}
 ## Escenas de modelos ya cargadas (nombre -> PackedScene o null).
 var _scenes := {}
 var _marker_material: StandardMaterial3D
@@ -113,7 +117,8 @@ func _init() -> void:
 	_board_root = Node3D.new()
 	_pieces_root = Node3D.new()
 	_markers_root = Node3D.new()
-	for node in [_board_root, _pieces_root, _markers_root]:
+	_fx_root = Node3D.new()
+	for node in [_board_root, _pieces_root, _markers_root, _fx_root]:
 		_viewport.add_child(node)
 
 	_marker_material = _unshaded(SELECT_COLOR, 0.8)
@@ -143,6 +148,29 @@ func refresh() -> void:
 		return
 	_sync_pieces()
 	_sync_bandit()
+
+
+## Resalta las casillas que producen: la ficha salta y aparece un anillo
+## que se desvanece.
+func flash_tiles(ids: Array) -> void:
+	for t in ids:
+		if _tokens.has(t):
+			var token: Node3D = _tokens[t]
+			var bounce := create_tween()
+			bounce.tween_property(token, "scale", Vector3.ONE * 1.4, 0.15).set_ease(Tween.EASE_OUT)
+			bounce.tween_property(token, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		var mat := _unshaded(SELECT_COLOR, 1.0)
+		mat.no_depth_test = true
+		var ring := _make_marker(Pick.TILE, t, mat)
+		_fx_root.add_child(ring)
+		var fade := create_tween()
+		fade.tween_property(mat, "albedo_color:a", 0.0, 1.2)
+		fade.tween_callback(ring.queue_free)
+
+
+func tile_screen_position(t: int) -> Vector2:
+	var c := board.grid.tile_center(t)
+	return global_position + _camera.unproject_position(Vector3(c.x, TILE_TOP, c.y))
 
 
 func fit(rect: Rect2) -> void:
@@ -242,7 +270,9 @@ func _build_board() -> void:
 	_clear(_board_root)
 	_clear(_pieces_root)
 	_clear(_markers_root)
+	_clear(_fx_root)
 	_pieces.clear()
+	_tokens.clear()
 	_bandit = null
 	_bandit_tile = -1
 	_hover_marker = null
@@ -294,7 +324,9 @@ func _make_tile(t: int) -> Node3D:
 		_add_decoration(tile, t)
 	var number := board.tile_number[t]
 	if number > 0:
-		tile.add_child(_make_token(number))
+		var token := _make_token(number)
+		tile.add_child(token)
+		_tokens[t] = token
 	return tile
 
 

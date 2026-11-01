@@ -9,6 +9,8 @@ extends Node2D
 ##     limita los clics a ellos (Pick.NONE para quitar),
 ##   - refresh(): vuelve a dibujar tras un cambio en la partida,
 ##   - fit(rect): encaja el tablero en un rectángulo de la pantalla,
+##   - flash_tiles(ids): resalta un momento las casillas que producen,
+##   - tile_screen_position(t): posición en pantalla de una casilla,
 ##   - señales hovered(kind, id) y clicked(kind, id).
 ## La detección se hace en "unidades de hexágono" con HexGrid, así que una
 ## vista 3D solo tiene que proyectar el rayo del ratón sobre el plano.
@@ -60,6 +62,9 @@ var _hover: Array = [Pick.NONE, -1]
 var _target_kind: Pick = Pick.NONE
 var _target_ids: Array[int] = []
 var _time := 0.0
+## Casillas resaltadas tras una tirada: casilla -> segundos restantes.
+var _flash := {}
+const FLASH_TIME := 1.2
 
 
 ## Tamaño del tablero (con el mar) en unidades de hexágono, para encajarlo.
@@ -84,9 +89,25 @@ func fit(rect: Rect2) -> void:
 	position = rect.get_center()
 
 
+func flash_tiles(ids: Array) -> void:
+	for t in ids:
+		_flash[t] = FLASH_TIME
+	queue_redraw()
+
+
+func tile_screen_position(t: int) -> Vector2:
+	return get_global_transform_with_canvas() * (board.grid.tile_center(t) * hex_size)
+
+
 func _process(delta: float) -> void:
 	if _target_kind != Pick.NONE:
 		_time += delta
+		queue_redraw()
+	if not _flash.is_empty():
+		for t in _flash.keys():
+			_flash[t] -= delta
+			if _flash[t] <= 0.0:
+				_flash.erase(t)
 		queue_redraw()
 
 
@@ -156,6 +177,11 @@ func _draw() -> void:
 		for v in game.vertex_owner.size():
 			if game.vertex_owner[v] != -1:
 				_draw_building(v, game.vertex_building[v], _player_color(game.vertex_owner[v]))
+	for t in _flash:
+		var alpha: float = _flash[t] / FLASH_TIME
+		var ring := HexCoords.corners(board.grid.tile_center(t) * hex_size, hex_size * (0.9 + 0.1 * (1.0 - alpha)))
+		ring.append(ring[0])
+		draw_polyline(ring, Color(SELECT_COLOR, alpha), hex_size * 0.1, true)
 	_draw_targets()
 	if _target_kind == Pick.NONE:
 		_draw_highlight(_hover, HOVER_COLOR)

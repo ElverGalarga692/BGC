@@ -41,6 +41,11 @@ var _points_label: Label
 var _prompt_label: Label
 var _error_label: Label
 var _dice_label: Label
+var _dice_view: DiceView
+## Filas del panel de jugadores (pid -> Control), destino de los recursos.
+var _player_rows := {}
+## Producción de la última tirada, para animarla cuando paren los dados.
+var _pending_production := {}
 var _roll_button: Button
 var _hand_box: GridContainer
 var _build_buttons := {}
@@ -86,10 +91,34 @@ func _start(seed: int) -> void:
 	_close_dialog()
 	game = ArchipelagoGame.new()
 	game.setup(App.session_players(), seed)
+	_create_ais(seed)
+	# Partida guardada: se reconstruye repitiendo sus acciones (antes de
+	# conectar la interfaz, para no animar ni registrar todo otra vez).
+	var saved: Array = App.session.get("history", [])
+	App.session.erase("history")
+	var load_error := game.replay(saved) if not saved.is_empty() else ""
 	game.action_applied.connect(_on_action_applied)
 	game.event.connect(_on_game_event)
 	game.game_finished.connect(_on_game_finished)
 	_board_view.game = game
+	_ai_pending = false
+	_ai_generation += 1
+	_log.clear()
+	_log_label.clear()
+	_mode = Mode.NONE
+	_victory.visible = false
+	if not saved.is_empty():
+		_add_log("Partida guardada cargada (%d jugadas)." % game.history.size())
+		if load_error != "":
+			_add_log("[color=#ff8a80]No se pudo cargar del todo: %s[/color]" % load_error)
+	else:
+		_add_log("Partida nueva (semilla %d). Colocación inicial." % seed)
+	_refresh()
+	_layout()
+	_show_banner("Turno de %s" % game.current_player().display_name, game.current_player().color)
+
+
+func _create_ais(seed: int) -> void:
 	_ais.clear()
 	_viewer = -1
 	for p in game.players:
@@ -100,16 +129,6 @@ func _start(seed: int) -> void:
 		elif _viewer == -1:
 			_viewer = p.id
 	_viewer = maxi(_viewer, 0)
-	_ai_pending = false
-	_ai_generation += 1
-	_log.clear()
-	_log_label.clear()
-	_mode = Mode.NONE
-	_victory.visible = false
-	_add_log("Partida nueva (semilla %d). Colocación inicial." % seed)
-	_refresh()
-	_layout()
-	_show_banner("Turno de %s" % game.current_player().display_name, game.current_player().color)
 
 
 # --- Construcción de la interfaz -------------------------------------------
@@ -163,10 +182,13 @@ func _build_left_panel() -> void:
 	_hover_label.modulate = Color(1, 1, 1, 0.7)
 	_hover_label.custom_minimum_size = Vector2(0, 36)
 	box.add_child(_hover_label)
+	box.add_child(_button("Reglas", func() -> void: RulesPanel.open(self, GameRegistry.find("archipelago")["rules"])))
 	_view_button = _button("", func() -> void: _set_view_3d(not _is_3d))
 	box.add_child(_view_button)
 	_ai_fast_toggle = CheckButton.new()
 	_ai_fast_toggle.text = "IA rápida"
+	_ai_fast_toggle.button_pressed = App.get_setting("ai_fast", false)
+	_ai_fast_toggle.toggled.connect(func(on: bool) -> void: App.set_setting("ai_fast", on))
 	box.add_child(_ai_fast_toggle)
 	box.add_child(_button("Volver al menú", App.go_to_menu))
 
@@ -194,8 +216,11 @@ func _build_right_panel() -> void:
 	_roll_button = _button("Tirar dados", func() -> void: _submit(G.ROLL))
 	_roll_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dice_row.add_child(_roll_button)
+	_dice_view = DiceView.new()
+	_dice_view.finished.connect(_on_dice_finished)
+	dice_row.add_child(_dice_view)
 	_dice_label = _label("", 20)
-	_dice_label.custom_minimum_size = Vector2(120, 0)
+	_dice_label.custom_minimum_size = Vector2(40, 0)
 	_dice_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dice_row.add_child(_dice_label)
@@ -356,7 +381,9 @@ func _refresh() -> void:
 	_prompt_label.text = _prompt_text()
 
 	_roll_button.disabled = not human_turn or game.validate(GameAction.new(G.ROLL, pid)) != ""
-	_dice_label.text = "" if game.last_roll.is_empty() else "%d + %d = %d" % [game.last_roll[0], game.last_roll[1], game.last_roll[0] + game.last_roll[1]]
+	if not _dice_view.is_rolling():
+		_dice_view.show_values(game.last_roll)
+		_dice_label.text = "" if game.last_roll.is_empty() else str(game.last_roll[0] + game.last_roll[1])
 
 	_hand_label.text = "Mano de %s" % viewer.display_name
 	_clear(_hand_box)
@@ -423,6 +450,7 @@ func _refresh_players() -> void:
 			award.add_theme_color_override("font_color", HIGHLIGHT)
 			column.add_child(award)
 		_players_box.add_child(column)
+		_player_rows[p.id] = column
 
 
 func _refresh_dev_cards(pid: int, can_play: bool) -> void:
@@ -847,6 +875,8 @@ func _submit(type: StringName, data: Dictionary = {}, pid: int = -1) -> void:
 	var actor := game.turns.current if pid < 0 else pid
 	var error := game.submit(GameAction.new(type, actor, data))
 	_error_label.text = error
+	if error != "":
+		Sfx.play(&"error")
 
 
 func _on_build_pressed(mode: Mode) -> void:
@@ -904,17 +934,26 @@ func _on_action_applied(action: GameAction) -> void:
 		G.ROLL:
 			var dice: Array = data["dice"]
 			_add_log("%s tira %d + %d = [b]%d[/b]." % [name, dice[0], dice[1], dice[0] + dice[1]])
+			Sfx.play(&"dice")
+			_dice_label.text = ""
+			_dice_view.roll(dice)
 		G.BUILD_ROAD:
 			_add_log("%s construye un camino." % name)
+			Sfx.play(&"build", 1.15)
 		G.BUILD_SETTLEMENT:
 			_add_log("%s construye un poblado." % name)
+			Sfx.play(&"build")
 		G.BUILD_CITY:
 			_add_log("%s mejora un poblado a ciudad." % name)
+			Sfx.play(&"build", 0.8)
 		G.TRADE_BANK:
 			_add_log("%s cambia %d %s por 1 %s con la banca." % [name, data["ratio"], ArchDefs.RESOURCE_NAMES[data["give"]], ArchDefs.RESOURCE_NAMES[data["receive"]]])
+			Sfx.play(&"trade")
 		G.DISCARD:
 			_add_log("  %s descarta %s." % [name, ArchipelagoGame.format_resources(data["cards"])])
+			Sfx.play(&"card")
 		G.MOVE_BANDIT:
+			Sfx.play(&"robber")
 			var victim := int(data.get("victim", -1))
 			if victim >= 0:
 				_add_log("%s mueve el bandido y roba una carta a %s." % [name, _player_name(victim)])
@@ -922,9 +961,11 @@ func _on_action_applied(action: GameAction) -> void:
 				_add_log("%s mueve el bandido." % name)
 		G.BUY_DEV:
 			_add_log("%s compra una carta de desarrollo." % name)
+			Sfx.play(&"card")
 		G.PLAY_DEV:
 			var card: int = data["card"]
 			var text := "%s juega [b]%s[/b]" % [name, ArchDefs.DEV_NAMES[card]]
+			Sfx.play(&"card", 0.9)
 			match card:
 				DevCard.HARVEST:
 					var amounts := [0, 0, 0, 0, 0]
@@ -938,6 +979,7 @@ func _on_action_applied(action: GameAction) -> void:
 			_add_log("%s ofrece a %s: %s por %s." % [name, _player_name(data["to"]), ArchipelagoGame.format_resources(data["give"]), ArchipelagoGame.format_resources(data["receive"])])
 		G.ACCEPT_TRADE:
 			_add_log("  %s acepta el intercambio." % name)
+			Sfx.play(&"trade")
 		G.REJECT_TRADE:
 			var offer: Dictionary = data["offer"]
 			_add_log("  %s %s la oferta." % [name, "retira" if action.player_id == offer["from"] else "rechaza"])
@@ -950,14 +992,21 @@ func _on_action_applied(action: GameAction) -> void:
 		_add_log("Termina la colocación inicial. ¡Empieza la partida!")
 	_refresh()
 	_board_view.refresh()
+	if game.finished:
+		App.delete_save("archipelago")
+	else:
+		App.save_game("archipelago", game.save_data())
 	if game.turns.current != action.player_id and action.type in [G.END_TURN, G.BUILD_ROAD] and not game.finished:
 		var p := game.current_player()
 		_show_banner("Turno de %s" % p.display_name, p.color)
+		if not p.is_ai:
+			Sfx.play(&"turn")
 
 
 func _on_game_event(kind: StringName, data: Dictionary) -> void:
 	match kind:
 		&"production":
+			_pending_production = data.duplicate(true)
 			var any := false
 			for p in data["gains"].size():
 				var text := ArchipelagoGame.format_resources(data["gains"][p])
@@ -969,12 +1018,18 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 			if not any and data["shortages"].is_empty():
 				_add_log("  Nadie produce.")
 		&"setup_resources":
+			var cards: Array = []
+			for t in game.board.grid.vertex_tiles[data["vertex"]]:
+				var r := game.board.tile_resource(t)
+				if r >= 0 and data["gains"][r] > 0:
+					cards.append([t, data["player"], r])
+			_fly_cards.call_deferred(cards)
 			var text := ArchipelagoGame.format_resources(data["gains"])
 			if text != "":
 				_add_log("  %s recibe %s." % [_player_name(data["player"]), text])
 		&"seven":
 			_add_log("  ¡Un 7! El bandido se mueve.")
-			_show_banner("¡7!", Color("ff8a80"))
+			_pending_production = {"seven": true}
 		&"longest_road":
 			if data["player"] >= 0:
 				_add_log("[b]%s consigue el Camino más largo (%d).[/b]" % [_player_name(data["player"]), data["length"]])
@@ -991,6 +1046,7 @@ func _on_game_finished(winner_ids: Array[int]) -> void:
 
 func _show_victory(winner_ids: Array[int]) -> void:
 	_close_dialog()
+	Sfx.play(&"win")
 	var winner := game.players[winner_ids[0]]
 	_add_log("[b]¡%s gana con %d puntos![/b]" % [winner.display_name, game.victory_points(winner.id)])
 	var title: Label = _victory.find_child("Title", true, false)
@@ -1025,6 +1081,80 @@ func _on_hovered(kind: ArchBoardView.Pick, id: int) -> void:
 			_hover_label.text = "Lado" + (". Puerto %s" % ArchDefs.port_label(port["type"]) if port != null else "")
 		_:
 			_hover_label.text = ""
+
+
+# --- Animaciones ----------------------------------------------------------------
+
+## Cuando paran los dados: se iluminan las casillas que producen y los
+## recursos vuelan hacia quien los recibe.
+func _on_dice_finished() -> void:
+	_dice_label.text = str(_dice_view.values[0] + _dice_view.values[1]) if _dice_view.values.size() == 2 else ""
+	var prod := _pending_production
+	_pending_production = {}
+	if prod.get("seven", false):
+		_show_banner("¡7!", Color("ff8a80"))
+		return
+	if not prod.has("number"):
+		return
+	var tiles: Array[int] = []
+	var cards: Array = []
+	for t in game.board.tiles_with_number(prod["number"]):
+		if t == game.board.bandit_tile:
+			continue
+		tiles.append(t)
+		var r := game.board.tile_resource(t)
+		if r in prod["shortages"]:
+			continue
+		for v in game.board.grid.tile_vertices[t]:
+			var owner := game.vertex_owner[v]
+			if owner == -1:
+				continue
+			for i in (1 if game.vertex_building[v] == G.Building.SETTLEMENT else 2):
+				cards.append([t, owner, r])
+	_board_view.flash_tiles(tiles)
+	_fly_cards(cards)
+
+
+## Hace volar cartas [casilla, jugador, recurso] desde su casilla hasta la
+## mano (si es del jugador que se muestra) o hasta su fila del panel.
+func _fly_cards(cards: Array) -> void:
+	if cards.is_empty() or _board_view == null:
+		return
+	var played_sound := false
+	for i in cards.size():
+		var t: int = cards[i][0]
+		var pid: int = cards[i][1]
+		var r: int = cards[i][2]
+		var target: Vector2
+		if pid == _viewer and r < _hand_box.get_child_count():
+			target = _hand_box.get_child(r).get_global_rect().get_center()
+		elif _player_rows.has(pid) and is_instance_valid(_player_rows[pid]):
+			var row: Control = _player_rows[pid]
+			target = row.get_global_rect().position + Vector2(40, 10)
+		else:
+			continue
+		var card := Panel.new()
+		var style := StyleBoxFlat.new()
+		style.bg_color = RESOURCE_COLORS[r]
+		style.set_corner_radius_all(3)
+		style.border_color = Color(1, 1, 1, 0.9)
+		style.set_border_width_all(2)
+		card.add_theme_stylebox_override("panel", style)
+		card.size = Vector2(18, 24)
+		card.pivot_offset = card.size / 2.0
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.position = _board_view.tile_screen_position(t) - card.size / 2.0
+		card.scale = Vector2.ZERO
+		add_child(card)
+		var tween := create_tween()
+		tween.tween_interval(i * 0.07)
+		tween.tween_property(card, "scale", Vector2.ONE * 1.3, 0.12)
+		tween.tween_property(card, "position", target - card.size / 2.0, 0.55).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		tween.parallel().tween_property(card, "scale", Vector2.ONE * 0.8, 0.55)
+		if not played_sound:
+			tween.tween_callback(Sfx.play.bind(&"resource", 1.0))
+			played_sound = true
+		tween.tween_callback(card.queue_free)
 
 
 # --- Utilidades -------------------------------------------------------------------

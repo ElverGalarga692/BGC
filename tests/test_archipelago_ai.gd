@@ -191,3 +191,33 @@ func test_card_tracker_exact_without_steals() -> void:
 				if absf(est[r] - game.hands[p][r]) > 0.001:
 					assert_eq(est[r], float(game.hands[p][r]), "jugador %d, recurso %d, paso %d (%s)" % [p, r, steps, action])
 					return
+
+
+## Guardar y cargar: repetir las acciones guardadas reconstruye exactamente
+## la misma partida (también tras pasar por el formato de archivo).
+func test_save_and_replay() -> void:
+	var game := _game([AILevel.NORMAL, AILevel.HARD, AILevel.EASY], 4040)
+	var ais := _ais_observing(game, 4040)
+	var steps := 0
+	while not game.finished and steps < 250:
+		game.submit(ais[game.players_to_act()[0]].choose_action(game))
+		steps += 1
+	var data: Dictionary = bytes_to_var(var_to_bytes(game.save_data()))
+	var copy := ArchipelagoGame.new()
+	copy.setup(GameBase.players_from_save(data), int(data["seed"]))
+	assert_eq(copy.replay(data["history"]), "")
+	assert_eq(copy.history.size(), game.history.size())
+	assert_eq(copy.hands, game.hands)
+	assert_eq(copy.vertex_owner, game.vertex_owner)
+	assert_eq(copy.edge_owner, game.edge_owner)
+	assert_eq(copy.dev_hands, game.dev_hands)
+	assert_eq(copy.board.bandit_tile, game.board.bandit_tile)
+	assert_eq(copy.turns.current, game.turns.current)
+	assert_eq(copy.phase, game.phase)
+	assert_eq(copy.players[1].ai_level, AILevel.HARD)
+	# La partida cargada se puede seguir jugando.
+	var ais2 := _ais_observing(copy, 4040)
+	var more := 0
+	while not copy.finished and more < 50:
+		assert_eq(copy.submit(ais2[copy.players_to_act()[0]].choose_action(copy)), "")
+		more += 1

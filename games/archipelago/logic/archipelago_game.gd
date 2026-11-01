@@ -707,7 +707,7 @@ func _give_setup_resources(pid: int, v: int) -> void:
 			gains[resource] += 1
 			bank[resource] -= 1
 			hands[pid][resource] += 1
-	event.emit(&"setup_resources", {"player": pid, "gains": gains})
+	event.emit(&"setup_resources", {"player": pid, "gains": gains, "vertex": v})
 
 
 ## Recalcula el Camino más largo. Quien lo tiene lo conserva en caso de

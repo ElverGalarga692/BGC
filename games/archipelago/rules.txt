@@ -1,0 +1,47 @@
+[font_size=26][b]Archipiélago[/b][/font_size]
+Coloniza un archipiélago, recoge recursos, comercia y construye. [b]Gana el primero que llegue a 10 puntos de victoria en su turno.[/b]
+
+[font_size=20][b]El tablero[/b][/font_size]
+Hay 19 casillas. Cada terreno produce un recurso:
+• [b]Bosque[/b] → Madera   • [b]Colinas[/b] → Ladrillo   • [b]Pastos[/b] → Lana
+• [b]Campos[/b] → Trigo   • [b]Montañas[/b] → Mineral   • [b]Desierto[/b] → nada
+Cada casilla lleva un número del 2 al 12. Los puntos bajo el número indican lo probable que es: cuantos más puntos, más sale. El 6 y el 8 (en rojo) son los más frecuentes y nunca están juntos.
+
+[font_size=20][b]Colocación inicial[/b][/font_size]
+Por turnos, cada jugador pone un [b]poblado[/b] en una esquina y un [b]camino[/b] pegado a él. Después se repite en orden inverso (el último en colocar es el primero de la segunda ronda). Con el segundo poblado recibes una carta de cada casilla que toca.
+
+[font_size=20][b]Tu turno[/b][/font_size]
+1. [b]Tira los dados.[/b] Las casillas con ese número producen: cada poblado que las toca recibe 1 carta y cada ciudad 2. Si el bandido está en una casilla, esa casilla no produce.
+2. [b]Construye, compra y comercia[/b] en el orden que quieras.
+3. [b]Termina el turno.[/b]
+
+[font_size=20][b]Construcciones[/b][/font_size]
+• [b]Camino[/b] (Madera + Ladrillo): en un lado conectado a tus caminos o edificios.
+• [b]Poblado[/b] (Madera + Ladrillo + Lana + Trigo) — 1 punto. Debe tocar uno de tus caminos y no puede haber otro edificio en las esquinas de al lado.
+• [b]Ciudad[/b] (2 Trigo + 3 Mineral) — 2 puntos. Mejora uno de tus poblados y produce el doble.
+• [b]Carta de desarrollo[/b] (Lana + Trigo + Mineral).
+Cada jugador tiene 15 caminos, 5 poblados y 4 ciudades.
+
+[font_size=20][b]Comercio[/b][/font_size]
+• [b]Con la banca:[/b] 4 cartas iguales por 1 de otra. Si tienes un edificio en un [b]puerto[/b], mejoras el cambio: 3:1 con cualquier recurso o 2:1 con el recurso del puerto.
+• [b]Con otros jugadores:[/b] ofrece un intercambio a un jugador; puede aceptarlo o rechazarlo.
+
+[font_size=20][b]El 7 y el bandido[/b][/font_size]
+Con un 7 nadie produce. Quien tenga [b]más de 7 cartas[/b] descarta la mitad (redondeando hacia abajo). Después, el jugador en turno [b]mueve el bandido[/b] a otra casilla y [b]roba una carta[/b] al azar a un jugador con un edificio en ella.
+
+[font_size=20][b]Cartas de desarrollo[/b][/font_size]
+Solo puedes jugar una por turno, y nunca el turno en que la compras.
+• [b]Miliciano:[/b] mueve el bandido y roba una carta. Se puede jugar antes de tirar.
+• [b]Monumento:[/b] 1 punto de victoria, oculto para los demás. No se juega: cuenta solo.
+• [b]Ingenieros:[/b] construye 2 caminos gratis.
+• [b]Cosecha abundante:[/b] toma 2 recursos cualesquiera de la banca.
+• [b]Monopolio:[/b] elige un recurso; todos te dan todas sus cartas de ese recurso.
+
+[font_size=20][b]Premios (2 puntos cada uno)[/b][/font_size]
+• [b]Camino más largo:[/b] el primero con un camino continuo de 5 o más. Pasa a quien lo supere. Un poblado rival en medio corta el camino.
+• [b]Mayor milicia:[/b] el primero que juegue 3 Milicianos. Pasa a quien juegue más.
+
+[font_size=20][b]Controles[/b][/font_size]
+• Clic izquierdo: elegir casilla, esquina o lado.   • Clic derecho o Esc: cancelar.
+• Vista 3D: rueda para el zoom; botón central o Q / E para girar la cámara.
+• La partida se guarda sola después de cada jugada: puedes continuarla desde el menú.

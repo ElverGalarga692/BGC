@@ -58,6 +58,37 @@ func finish(p_winner_ids: Array[int]) -> void:
 	game_finished.emit(winner_ids)
 
 
+# --- Guardar y cargar --------------------------------------------------------
+
+## Datos para guardar la partida: con la semilla, los jugadores y la lista de
+## acciones se puede reconstruir exactamente (las partidas son deterministas).
+func save_data() -> Dictionary:
+	return {
+		"version": 1,
+		"seed": rng.seed_value,
+		"players": players.map(func(p: PlayerInfo) -> Dictionary: return p.to_dict()),
+		"history": history.map(func(a: GameAction) -> Dictionary: return a.to_dict()),
+	}
+
+
+static func players_from_save(data: Dictionary) -> Array[PlayerInfo]:
+	var result: Array[PlayerInfo] = []
+	for d in data.get("players", []):
+		result.append(PlayerInfo.from_dict(d))
+	return result
+
+
+## Vuelve a aplicar una lista de acciones guardadas (tras setup() con la
+## misma semilla). Devuelve "" o el error de la primera acción que falle.
+func replay(actions: Array) -> String:
+	for d in actions:
+		var action := GameAction.from_dict(d)
+		var error := submit(action)
+		if error != "":
+			return "Acción %d (%s): %s" % [history.size(), action.type, error]
+	return ""
+
+
 # --- Métodos a implementar por cada juego ---------------------------------
 
 ## Se llama al final de setup(); aquí se crea el estado inicial del juego.

@@ -89,3 +89,12 @@ func test_registry_has_archipelago() -> void:
 	var game := GameRegistry.find("archipelago")
 	assert_false(game.is_empty())
 	assert_true(ResourceLoader.exists(game["scene"]), "la escena del juego existe")
+
+
+func test_sfx_sounds_are_generated() -> void:
+	var sfx: Node = load("res://core/sfx.gd").new()
+	sfx._streams = {&"dice": sfx._dice(), &"bell": sfx._bell(), &"tone": sfx._tone([440.0], 0.1, 0.3)}
+	for key in sfx._streams:
+		var stream: AudioStreamWAV = sfx._streams[key]
+		assert_true(stream.data.size() > 1000, "el sonido %s tiene datos" % key)
+	sfx.free()

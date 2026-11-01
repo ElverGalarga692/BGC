@@ -15,6 +15,8 @@ var _settings := ConfigFile.new()
 
 func _ready() -> void:
 	_settings.load(SETTINGS_PATH)  # si no existe, se usan los valores por defecto
+	if get_setting("fullscreen", false):
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 ## Ajustes del usuario que se guardan entre sesiones (p. ej. vista 2D/3D).
@@ -25,6 +27,51 @@ func get_setting(key: String, default: Variant) -> Variant:
 func set_setting(key: String, value: Variant) -> void:
 	_settings.set_value("general", key, value)
 	_settings.save(SETTINGS_PATH)
+
+
+# --- Partidas guardadas -------------------------------------------------------
+
+func _save_path(game_id: String) -> String:
+	return "user://saves/%s.save" % game_id
+
+
+func save_game(game_id: String, data: Dictionary) -> void:
+	DirAccess.make_dir_recursive_absolute("user://saves")
+	var file := FileAccess.open(_save_path(game_id), FileAccess.WRITE)
+	if file != null:
+		file.store_var(data)
+
+
+func has_save(game_id: String) -> bool:
+	return FileAccess.file_exists(_save_path(game_id))
+
+
+func load_save(game_id: String) -> Dictionary:
+	var file := FileAccess.open(_save_path(game_id), FileAccess.READ)
+	if file == null:
+		return {}
+	var data = file.get_var()
+	return data if data is Dictionary else {}
+
+
+func delete_save(game_id: String) -> void:
+	if has_save(game_id):
+		DirAccess.remove_absolute(_save_path(game_id))
+
+
+## Continúa la partida guardada de un juego.
+func continue_game(game_id: String) -> void:
+	var data := load_save(game_id)
+	if data.is_empty():
+		return
+	var game := GameRegistry.find(game_id)
+	session = {
+		"game_id": game_id,
+		"players": GameBase.players_from_save(data),
+		"seed": int(data["seed"]),
+		"history": data.get("history", []),
+	}
+	get_tree().change_scene_to_file(game["scene"])
 
 
 func start_game(game_id: String, players: Array[PlayerInfo], seed: int = -1) -> void:

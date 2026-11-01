@@ -38,7 +38,8 @@ los tests y el guardado de partidas reutilizan la misma lógica.
 
 ```
 core/                    Compartido por todos los juegos
-  app.gd                 Autoload "App": navegación y datos de la sesión
+  app.gd                 Autoload "App": navegación, sesión, ajustes y partidas guardadas
+  sfx.gd                 Autoload "Sfx": efectos de sonido sintetizados
   game_base.gd           Clase base de la lógica de un juego
   game_registry.gd       Lista de juegos de la colección
   action.gd              GameAction: una jugada serializable
@@ -48,8 +49,11 @@ core/                    Compartido por todos los juegos
   hex_coords.gd          Matemática de hexágonos (coordenadas axiales)
   hex_grid.gd            Topología: casillas, vértices, aristas
 ui_common/
-  main_menu.gd           Selector de juego y configuración de jugadores
+  main_menu.gd           Selector de juego, jugadores, ajustes y "Continuar"
+  dice_view.gd           Dados con animación de tirada
+  rules_panel.gd         Ventana de reglas (texto BBCode de cada juego)
 games/archipelago/
+  rules.txt              Reglas del juego (se muestran en el juego)
   logic/                 Reglas y estado (sin nodos)
     arch_defs.gd         Terrenos, recursos, fichas, puertos
     arch_board.gd        Tablero: terrenos, números, puertos, bandido
@@ -101,11 +105,26 @@ nombre. Convenciones que usa la vista 3D:
 - La carpeta `art/` lleva un `.gdignore` para que Godot no intente importar
   el `.blend`.
 
+### Sonido
+
+Los efectos se sintetizan al arrancar (`core/sfx.gd`), así que no hay
+archivos de audio. Para sustituir uno por una grabación, pon un `.wav` u
+`.ogg` con su nombre en `res://assets/sfx/` (por ejemplo `dice.wav`).
+Nombres: `dice`, `build`, `resource`, `card`, `robber`, `turn`, `trade`,
+`win`, `error`, `click`.
+
+### Partidas guardadas
+
+Como las partidas son deterministas, guardar es solo guardar la semilla, los
+jugadores y la lista de acciones (`GameBase.save_data()`); al cargar se
+repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
+`user://saves/<juego>.save` y se borra al terminar la partida.
+
 ### Añadir un juego nuevo
 
 1. Crea `games/<id>/` con `logic/` (una clase que herede de `GameBase`) y
    `view/` (la escena).
-2. Registra el juego en `core/game_registry.gd`.
+2. Registra el juego en `core/game_registry.gd` (con su archivo de reglas).
 3. Añade tests en `tests/test_<id>_*.gd`.
 
 ## Hoja de ruta
@@ -130,6 +149,9 @@ nombre. Convenciones que usa la vista 3D:
       a la vista 2D en cualquier momento.
 - [x] **Modelos de Blender.** Fichas de terreno, piezas, bandido, fichas
       numéricas y muelles, generados con un script de Blender reproducible.
-- [ ] **Fase 5: pulido.** Más animaciones (dados, recursos), sonido, guardar
-      y cargar, tutorial, ajustes.
+- [x] **Fase 5: pulido.** Dados animados, casillas que se iluminan al
+      producir, recursos que vuelan a la mano, efectos de sonido
+      sintetizados, guardado automático con "Continuar partida", pantalla
+      de reglas y menú de ajustes (volumen, pantalla completa, 2D/3D,
+      velocidad de la IA).
 - [ ] **Siguiente juego** de la colección.

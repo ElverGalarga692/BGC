@@ -10,6 +10,7 @@ static func all_games() -> Array[Dictionary]:
 			"name": "Archipiélago",
 			"description": "Coloniza un archipiélago de islas hexagonales, recoge recursos, comercia y construye.",
 			"scene": "res://games/archipelago/archipelago.tscn",
+			"rules": "res://games/archipelago/rules.txt",
 			"min_players": 2,
 			"max_players": 4,
 		},
