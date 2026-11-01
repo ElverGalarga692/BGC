@@ -16,8 +16,8 @@ Juegos:
   construye (2–4 jugadores).
 - **Pests!**: exterminadores rivales en una casa infestada; sella tu nido,
   elimina tus plagas y atrapa a tu reina antes que nadie (2–6 jugadores).
-  Opciones en el menú: reglas rápidas (exterminadores y cartas al azar) y
-  casa construida al azar.
+  Opciones en el menú: reglas rápidas (exterminadores y cartas al azar),
+  casa construida al azar y partida por equipos (4 o 6 jugadores).
 
 ## Cómo ejecutarlo
 
@@ -99,7 +99,9 @@ games/pests/             Pests!
                          prioridades) y difícil (planifica el turno en copias
                          de la partida y evalúa el resultado)
   view/
-    pests_board_view.gd  Vista 2D de la casa: losetas, puertas, piezas
+    pests_board_view.gd  Vista 2D de la casa, dibujada por código (suelos,
+                         muebles, nidos, bichos, trampas) y animaciones
+    queen_die_view.gd    Dado de la reina con animación de tirada
     pests_screen.gd      Pantalla de juego: jugadores, registro, acciones, cartas
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```

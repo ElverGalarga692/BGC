@@ -67,6 +67,14 @@ Empiezas con 4. Jugar una cuesta 1 punto de acción y se descarta al final de tu
 [font_size=20][b]Trampas[/b][/font_size]
 Una trampa guarda 7 plagas de su color [b]o[/b] su reina, nunca las dos cosas. Al soltarla atrapa lo que haya en la habitación y sigue atrapando lo que entre hasta llenarse.
 
+[font_size=20][b]Por equipos (opcional)[/b][/font_size]
+Con 4 o 6 jugadores se puede jugar en dos equipos alternos (jugadores 1, 3 y 5 contra 2, 4 y 6):
+• [b]Ganáis[/b] cuando todos los nidos del equipo están sellados, no queda ninguna plaga del equipo en la casa, todas las reinas del equipo están atrapadas y uno de vosotros vacía la trampa con su reina.
+• [b]Perdéis[/b] si cualquier jugador del equipo tiene todas sus plagas en la casa al final de su turno: cae todo el equipo.
+• Puedes [b]exterminar plagas de cualquier color[/b] (eliges cuáles), pero solo sellas tu nido (salvo con una carta) y tu trampa solo atrapa tu color.
+• Si estás en la misma habitación que un compañero, podéis [b]intercambiar cartas[/b] cuanto queráis durante tu turno, gratis.
+• Las cartas ofensivas, desellar nidos y destruir trampas solo se usan contra el equipo rival.
+
 [font_size=20][b]Aclaraciones de esta versión[/b][/font_size]
 El reglamento original es una edición de prueba (v1.2) y deja algunas dudas. Así se resuelven aquí:
 • [b]Reina roja:[/b] se usa lo que dice su carta (+1 al exterminar y plagas a 2 habitaciones al poblar). El reglamento menciona en una nota que la reina roja invoca, pero eso viene de una versión anterior.

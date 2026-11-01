@@ -35,6 +35,8 @@ var _turn_label: Label
 var _prompt_label: Label
 var _error_label: Label
 var _status_label: RichTextLabel
+var _queen_die: QueenDieView
+var _d6: DiceView
 var _actions_box: VBoxContainer
 var _hand_label: Label
 var _hand_box: VBoxContainer
@@ -228,6 +230,22 @@ func _build_right_panel() -> void:
 	_status_label.add_theme_font_size_override("normal_font_size", 14)
 	_status_label.add_theme_font_size_override("bold_font_size", 14)
 	box.add_child(_status_label)
+	var dice_row := HBoxContainer.new()
+	dice_row.add_theme_constant_override("separation", 10)
+	var queen_label := _label("Dado de la reina", 13)
+	queen_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	queen_label.modulate = DIM
+	dice_row.add_child(queen_label)
+	_queen_die = QueenDieView.new()
+	dice_row.add_child(_queen_die)
+	var d6_label := _label("  d6", 13)
+	d6_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	d6_label.modulate = DIM
+	dice_row.add_child(d6_label)
+	_d6 = DiceView.new()
+	_d6.custom_minimum_size = Vector2(52, 46)
+	dice_row.add_child(_d6)
+	box.add_child(dice_row)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -273,6 +291,14 @@ func _build_overlays() -> void:
 	_victory = PanelContainer.new()
 	_victory.custom_minimum_size = Vector2(420, 0)
 	_victory.visible = false
+	var victory_style := StyleBoxFlat.new()
+	victory_style.bg_color = Color("241c18")
+	victory_style.border_color = HIGHLIGHT
+	victory_style.set_border_width_all(3)
+	victory_style.set_corner_radius_all(14)
+	victory_style.shadow_size = 18
+	victory_style.shadow_color = Color(0, 0, 0, 0.6)
+	_victory.add_theme_stylebox_override("panel", victory_style)
 	add_child(_victory)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -288,6 +314,7 @@ func _build_overlays() -> void:
 	box.add_child(title)
 	var details := _label("", 15)
 	details.name = "Details"
+	details.custom_minimum_size = Vector2(360, 0)
 	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(details)
 	var again := _button("Nueva partida (mismos jugadores)", func() -> void: _start(BGCRng.random_seed()))
@@ -332,6 +359,10 @@ func _refresh() -> void:
 	_turn_label.add_theme_color_override("font_color", _color(pid))
 	_prompt_label.text = _prompt_text(actor)
 	_status_label.text = _status_text()
+	if not _queen_die.is_rolling():
+		_queen_die.show_face(game.last_queen_face)
+	if not _d6.is_rolling():
+		_d6.show_values([game.last_roll] if game.last_roll > 0 else [])
 	_clear(_actions_box)
 	if actor >= 0:
 		match game.phase:
@@ -367,7 +398,7 @@ func _refresh_players() -> void:
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 1)
 		panel.add_child(box)
-		var name := _label(p.display_name + (" (IA)" if p.is_ai else ""), 15)
+		var name := _label(p.display_name + (" (IA)" if p.is_ai else "") + ((" · Equipo %s" % ["A", "B"][game.team_of[pid]]) if game.teams_enabled() and game.species(pid) < 0 else ""), 15)
 		name.add_theme_color_override("font_color", _color(pid))
 		box.add_child(name)
 		var sp := game.species(pid)
@@ -375,6 +406,8 @@ func _refresh_players() -> void:
 			var species_label := _label("%s — %s" % [D.COLOR_NAMES[sp], D.SPECIES_NAMES[sp]], 12)
 			species_label.add_theme_color_override("font_color", Color(D.SPECIES_COLORS[sp]).lightened(0.15))
 			species_label.tooltip_text = D.SPECIES_ABILITY_TEXT[sp]
+			if game.teams_enabled():
+				species_label.text += "  · Equipo %s" % ["A", "B"][game.team_of[pid]]
 			species_label.mouse_filter = Control.MOUSE_FILTER_PASS
 			box.add_child(species_label)
 		if game.eliminated[pid]:
@@ -408,9 +441,7 @@ func _status_text() -> String:
 	var parts: Array[String] = []
 	if game.last_queen_face >= 0:
 		var face: Dictionary = D.QUEEN_DIE[game.last_queen_face]
-		parts.append("Dado de la reina: [b][color=#%s]%s[/color][/b] (%s)" % [Color(D.SPECIES_COLORS[face["species"]]).to_html(false), face["letter"], D.QUEEN_ACTION_NAMES[face["action"]]])
-	if game.last_roll > 0:
-		parts.append("d6: [b]%d[/b]" % game.last_roll)
+		parts.append("Última tirada de la reina: [b]%s[/b] (%s)" % [face["letter"], D.QUEEN_ACTION_NAMES[face["action"]]])
 	if game.phase == G.Phase.EXTERMINATOR:
 		var line := "Movimiento gratis: [b]%s[/b] · Puntos de acción: [b]%d[/b]" % ["sí" if game.free_move else "no", game.action_points]
 		if game.energy_moves > 0:
@@ -518,6 +549,9 @@ func _build_exterminator_actions(pid: int) -> void:
 		[G.UNSEAL_NEST, "Desellar nido rival"],
 		[G.BUY_CARD, "Comprar carta"],
 	]
+	if game.teams_enabled():
+		entries.append([G.GIVE_CARD, "Dar carta a un compañero"])
+		entries.append([G.TAKE_CARD, "Coger carta de un compañero"])
 	for entry in entries:
 		var type: StringName = entry[0]
 		var actions := _of_type(legal, type)
@@ -674,6 +708,15 @@ func _cancel_dialog() -> void:
 func _describe(a: GameAction) -> String:
 	var data := a.data
 	var parts: Array[String] = []
+	if a.type == G.EXTERMINATE and data.has("species"):
+		var sp := int(data["species"])
+		var here: int = game.exterminator_room[a.player_id]
+		return "Plagas %s (%d aquí)%s" % [String(D.COLOR_NAMES[sp]).to_lower(), game.pests_in_room(here, sp),
+			"" if game.same_team(a.player_id, maxi(0, game.player_of(sp))) else " — ¡de un rival!"]
+	if a.type in [G.GIVE_CARD, G.TAKE_CARD]:
+		var mate := int(data.get("to", data.get("from", 0)))
+		return "%s «%s» %s %s" % ["Dar" if a.type == G.GIVE_CARD else "Coger", D.card(data["card"])["name"],
+			"a" if a.type == G.GIVE_CARD else "de", game.players[mate].display_name]
 	if a.type == G.PLAY_CARD and data.has("use"):
 		parts.append("Usar «%s»" % D.card(data["use"])["name"])
 	if data.has("trap"):
@@ -881,6 +924,7 @@ func _on_action_applied(action: GameAction) -> void:
 		G.EXTERMINATE:
 			line = "%s tira el d6: [b]%d[/b] y extermina %d." % [name, data["roll"], data["removed"]]
 			Sfx.play(&"dice")
+			_d6.roll([data["roll"]])
 		G.DROP_TRAP, G.DRAG_TRAP, G.EMPTY_TRAP, G.DESTROY_TRAP:
 			Sfx.play(&"build", 0.8)
 		G.BUY_CARD, G.DRAFT_CARD, G.PLAY_CARD:
@@ -915,6 +959,59 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 	var text := _event_text(kind, data)
 	if text != "":
 		_pending_log.append(text)
+	_animate_event(kind, data)
+
+
+## Animaciones del tablero y de los dados para cada suceso de la partida.
+func _animate_event(kind: StringName, data: Dictionary) -> void:
+	var sp := int(data.get("species", -1))
+	var color: Color = D.SPECIES_COLORS[sp] if sp >= 0 else Color.WHITE
+	match kind:
+		&"queen_rolled":
+			_queen_die.roll(data["face"])
+		&"queen_moved":
+			_board.move_piece(int(data.get("from", -1)), data["room"], "queen", sp)
+		&"exterminator_moved", &"trap_dragged":
+			_board.move_piece(int(data.get("from", -1)), data["room"], "exterminator", game.species(data["player"]))
+		&"pests_summoned":
+			for m in data["moves"]:
+				_board.fly(m["from"], m["to"], color, m["count"])
+		&"queen_populated":
+			for r in data["rooms"]:
+				_board.fly(int(data.get("from", r)), r, color, data["rooms"][r])
+		&"pests_spread":
+			for r in data["rooms"]:
+				_board.pop(r, color, data["rooms"][r])
+		&"queen_dropped", &"nest_spawned":
+			if data["count"] > 0:
+				_board.pop(data["room"], color, data["count"])
+		&"pests_exterminated":
+			if data["count"] > 0:
+				_board.flash(data["room"], Color("ff5252"))
+				_board.float_text(data["room"], "−%d" % data["count"], Color("ff8a80"))
+		&"pests_trapped":
+			_board.flash(data["room"], color)
+			_board.float_text(data["room"], "+%d en la trampa" % data["count"], color.lightened(0.3))
+		&"queen_trapped":
+			_board.flash(data["room"], Color("ffd166"))
+			_board.float_text(data["room"], "¡Reina atrapada!", Color("ffd166"))
+			Sfx.play(&"win", 1.4)
+		&"queen_escaped":
+			_board.float_text(data["room"], "¡Se escapa!", color.lightened(0.3))
+		&"queen_angry":
+			if game.queen_room[sp] >= 0:
+				_board.float_text(game.queen_room[sp], "¡Grrr!", Color("ff5252"))
+		&"nest_sealed":
+			var nest := game.house.nest_of(sp)
+			_board.flash(nest, Color("b71c1c"))
+			_board.float_text(nest, "¡Sellado!", Color("ffcdd2"))
+		&"nest_unsealed":
+			_board.float_text(game.house.nest_of(sp), "¡Desellado!", Color("ff8a80"))
+		&"tile_placed":
+			_board.refresh()
+			_board.flash(data["room"], Color("ffd166"))
+		&"trap_dropped":
+			_board.flash(data["room"], Color(1, 1, 1))
 
 
 func _event_text(kind: StringName, data: Dictionary) -> String:
@@ -972,6 +1069,8 @@ func _event_text(kind: StringName, data: Dictionary) -> String:
 			return "%s sella el nido de %s." % [_player_name(data["player"]), _species_text(data["species"])]
 		&"nest_unsealed":
 			return "%s quita el sello del nido de %s." % [_player_name(data["player"]), _species_text(data["species"])]
+		&"card_exchanged":
+			return "%s da una carta a %s." % [_player_name(data["from"]), _player_name(data["to"])]
 		&"card_bought":
 			return "%s compra una carta." % _player_name(data["player"])
 		&"card_played":
@@ -1006,7 +1105,15 @@ func _show_victory(winner_ids: Array[int]) -> void:
 	var winner := game.players[winner_ids[0]] if not winner_ids.is_empty() else null
 	var title: Label = _victory.find_child("Title", true, false)
 	var details: Label = _victory.find_child("Details", true, false)
-	if winner != null:
+	if winner != null and winner_ids.size() > 1:
+		var names: Array[String] = []
+		for w in winner_ids:
+			names.append(game.players[w].display_name)
+		_add_log("[b]¡Gana el equipo de %s![/b]" % " y ".join(names))
+		title.text = "¡Gana el equipo %s!" % ["A", "B"][game.team_of[winner.id]]
+		title.add_theme_color_override("font_color", _color(winner.id))
+		details.text = " y ".join(names)
+	elif winner != null:
 		var sp := game.species(winner.id)
 		_add_log("[b]¡%s gana y cobra el trabajo![/b]" % winner.display_name)
 		title.text = "¡%s gana!" % winner.display_name

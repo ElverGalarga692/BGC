@@ -48,6 +48,8 @@ const WIN_PATH_VALUE := 40.0
 const WIN_PATH_STEP := 8.0
 const LEADER_WEIGHT := 0.35
 const OTHERS_WEIGHT := 0.1
+## Por equipos: cuánto le importa el progreso de cada compañero.
+const TEAM_WEIGHT := 0.8
 ## Cuánto perjudica cada carta que un jugador tiene delante.
 const EFFECT_PENALTY := {"fertile": 7.0, "two_by_two": 7.0, "stuck": 5.0, "angry_queen": 4.0, "royal_persuasion": 4.0}
 ## Muestras para las jugadas con azar (salvo exterminar, que usa la media).
@@ -185,7 +187,7 @@ func _rule_based(game: PestsGame, legal: Array[GameAction], use_offensive: bool)
 		var trap := _find(legal, G.DROP_TRAP, {"target": "queen"})
 		if trap != null:
 			return trap
-	var exterminate := _find(legal, G.EXTERMINATE)
+	var exterminate := _best_exterminate(game, legal)
 	if exterminate != null:
 		return exterminate
 	# 6. Una trampa de sobra para las plagas, si hay muchas aquí.
@@ -203,6 +205,24 @@ func _rule_based(game: PestsGame, legal: Array[GameAction], use_offensive: bool)
 	if move != null:
 		return move
 	return _find(legal, G.END_TURN)
+
+
+## Exterminar las plagas propias o, por equipos, las del compañero que más
+## tenga en la habitación (nunca las de un rival).
+func _best_exterminate(game: PestsGame, legal: Array[GameAction]) -> GameAction:
+	var here: int = game.exterminator_room[pid]
+	var best: GameAction = null
+	var best_count := 0
+	for a in _all(legal, G.EXTERMINATE):
+		var sp := int(a.data.get("species", game.species(pid)))
+		var owner := game.player_of(sp)
+		if owner < 0 or not game.same_team(pid, owner):
+			continue
+		var count := game.pests_in_room(here, sp) + (100 if sp == game.species(pid) else 0)
+		if count > best_count:
+			best_count = count
+			best = a
+	return best
 
 
 func _useful_card(game: PestsGame, legal: Array[GameAction]) -> GameAction:
@@ -266,9 +286,12 @@ func _best_move(game: PestsGame, legal: Array[GameAction]) -> GameAction:
 	return null
 
 
-## Interés de una habitación para el exterminador.
+## Interés de una habitación para el exterminador (por equipos cuentan
+## también las plagas de los compañeros, que puede exterminar).
 func _room_value(game: PestsGame, sp: int, room: int) -> float:
 	var value := float(game.pests_in_room(room, sp))
+	for mate in game.teammates(pid):
+		value += 0.8 * game.pests_in_room(room, game.species(mate))
 	if game.queen_room[sp] == room and not game.is_queen_trapped(sp) and game.traps_available(pid) > 0:
 		value += 4.0
 	if game.house.nest_of(sp) == room and not game.sealed[sp]:
@@ -289,6 +312,8 @@ func evaluate(game: PestsGame) -> float:
 	if game.eliminated[pid]:
 		return -WIN_VALUE
 	var value := _progress(game, pid) + _position(game)
+	for mate in game.teammates(pid):
+		value += TEAM_WEIGHT * _progress(game, mate)
 	var leader := -INF
 	var others := 0.0
 	for o in game.opponents(pid):
@@ -407,7 +432,7 @@ func _apply_planned(game: PestsGame, a: GameAction, seed_value: int) -> PestsGam
 		if c.validate(a) != "":
 			return null
 		c._pay(pid, a.type, a.data)
-		c.exterminate(pid, EXPECTED_ROLL + int(c.ability(pid, "exterminate_bonus")))
+		c.exterminate(pid, EXPECTED_ROLL + int(c.ability(pid, "exterminate_bonus")), int(a.data.get("species", -1)))
 		return c
 	if c.submit(a) != "":
 		return null

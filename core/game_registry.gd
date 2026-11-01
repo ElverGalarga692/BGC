@@ -25,6 +25,7 @@ static func all_games() -> Array[Dictionary]:
 			"options": [
 				{"key": "quick_species", "label": "Reglas rápidas: exterminadores y cartas al azar", "default": false},
 				{"key": "auto_house", "label": "Construir la casa al azar", "default": true},
+				{"key": "teams", "label": "Por equipos (con 4 o 6 jugadores)", "default": false},
 			],
 		},
 	]
