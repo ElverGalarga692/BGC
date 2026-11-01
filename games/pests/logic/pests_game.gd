@@ -196,6 +196,61 @@ func _on_setup() -> void:
 		turns.begin_sequence(order, start_player)
 
 
+# --- Copia (para que la IA pruebe jugadas) ---------------------------------------
+
+## Copia independiente del estado de la partida, sin historial ni señales
+## conectadas. La casa se comparte (no cambia una vez construida); el azar se
+## copia con su estado, o se siembra con `rng_seed` si es >= 0 (para probar
+## varios resultados posibles de una jugada con dados).
+func clone(rng_seed: int = -1) -> PestsGame:
+	var c := PestsGame.new()
+	c.players = players
+	c.rng = BGCRng.new(rng.seed_value)
+	if rng_seed >= 0:
+		c.rng = BGCRng.new(rng_seed)
+	else:
+		c.rng.set_state(rng.get_state())
+	c.turns = TurnManager.new(turns.player_count, turns.start_player)
+	c.turns.current = turns.current
+	c.turns.round_number = turns.round_number
+	c.turns._sequence = turns._sequence.duplicate()
+	c.turns._sequence_index = turns._sequence_index
+	c.turns._resume_at = turns._resume_at
+	c.finished = finished
+	c.winner_ids = winner_ids.duplicate()
+	c.options = options.duplicate()
+	c.phase = phase
+	c.house = house
+	c.start_player = start_player
+	c.species_of = species_of.duplicate()
+	c.tile_hands = tile_hands.duplicate(true)
+	c.tiles_placed = tiles_placed.duplicate()
+	c.pests = pests.duplicate(true)
+	c.reserve = reserve.duplicate()
+	c.pool = pool.duplicate()
+	c.queen_room = queen_room.duplicate()
+	c.sealed = sealed.duplicate()
+	c.exterminator_room = exterminator_room.duplicate()
+	c.eliminated = eliminated.duplicate()
+	c.turns_taken = turns_taken.duplicate()
+	c.traps = traps.duplicate(true)
+	c._next_trap_id = _next_trap_id
+	c.hands = hands.duplicate(true)
+	c.deck = deck.duplicate()
+	c.discard = discard.duplicate()
+	c.draft_pool = draft_pool.duplicate()
+	c.played_this_turn = played_this_turn.duplicate()
+	c.effects = effects.duplicate(true)
+	c.queen_steps = queen_steps.duplicate(true)
+	c.queen_steps_done = queen_steps_done
+	c.free_move = free_move
+	c.action_points = action_points
+	c.energy_moves = energy_moves
+	c.last_queen_face = last_queen_face
+	c.last_roll = last_roll
+	return c
+
+
 # --- Guardar y cargar -----------------------------------------------------------
 
 func save_data() -> Dictionary:

@@ -95,7 +95,9 @@ games/pests/             Pests!
     pests_game.gd        La partida (GameBase): elección de exterminador,
                          cartas, construcción de la casa, reina, acciones,
                          trampas, victoria y eliminación
-    pests_ai.gd          IA (voraz, versión inicial)
+    pests_ai.gd          IA: fácil (reglas con errores), normal (reglas con
+                         prioridades) y difícil (planifica el turno en copias
+                         de la partida y evalúa el resultado)
   view/
     pests_board_view.gd  Vista 2D de la casa: losetas, puertas, piezas
     pests_screen.gd      Pantalla de juego: jugadores, registro, acciones, cartas
