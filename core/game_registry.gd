@@ -22,8 +22,6 @@ static func all_games() -> Array[Dictionary]:
 			"rules": "res://games/conjura/rules.txt",
 			"min_players": 5,
 			"max_players": 10,
-			# Red local: llegará en la Fase 4 (información oculta por asiento).
-			"network": false,
 		},
 	]
 

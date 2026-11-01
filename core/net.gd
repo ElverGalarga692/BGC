@@ -27,8 +27,9 @@ signal disconnected(reason: String)
 
 const PORT := 47810
 const DISCOVERY_PORT := 47811
-const PROTOCOL := "bgc-1"
-const MAX_PLAYERS := 4
+const PROTOCOL := "bgc-2"
+## Conexiones máximas del servidor (el límite real lo pone cada juego).
+const MAX_CONNECTIONS := 16
 const ANNOUNCE_INTERVAL := 1.0
 const HOST_TIMEOUT := 3.5
 
@@ -57,6 +58,15 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(func() -> void: _fail("El anfitrión ha cerrado la partida."))
 
 
+## Jugadores máximos y mínimos del juego de la sala.
+func max_players() -> int:
+	return GameRegistry.find(game_id).get("max_players", 4)
+
+
+func min_players() -> int:
+	return maxi(2, GameRegistry.find(game_id).get("min_players", 2))
+
+
 func my_id() -> int:
 	return multiplayer.get_unique_id() if active else 1
 
@@ -74,7 +84,7 @@ func local_seat() -> int:
 func host_game(player_name: String, p_game_id: String = "archipelago", port: int = PORT) -> String:
 	leave()
 	_peer = ENetMultiplayerPeer.new()
-	var err := _peer.create_server(port, MAX_PLAYERS)
+	var err := _peer.create_server(port, MAX_CONNECTIONS)
 	if err != OK:
 		return "No se pudo crear la partida (¿el puerto %d está ocupado?)." % port
 	multiplayer.multiplayer_peer = _peer
@@ -148,7 +158,7 @@ func _process(delta: float) -> void:
 		_announce_timer -= delta
 		if _announce_timer <= 0.0:
 			_announce_timer = ANNOUNCE_INTERVAL
-			var msg := {"protocol": PROTOCOL, "name": my_name, "game": game_id, "players": seats.size(), "max": MAX_PLAYERS, "port": PORT}
+			var msg := {"protocol": PROTOCOL, "name": my_name, "game": game_id, "players": seats.size(), "max": max_players(), "port": PORT}
 			_announcer.put_packet(JSON.stringify(msg).to_utf8_buffer())
 	if _listener != null:
 		var changed := false
@@ -183,7 +193,7 @@ func _register(player_name: String, protocol: String) -> void:
 		_kick.rpc_id(sender, "Versión del juego distinta a la del anfitrión.")
 	elif in_game:
 		_kick.rpc_id(sender, "La partida ya ha empezado.")
-	elif seats.size() >= MAX_PLAYERS:
+	elif seats.size() >= max_players():
 		_kick.rpc_id(sender, "La mesa está llena.")
 	else:
 		seats.append({"peer": sender, "name": player_name.substr(0, 16), "ai": PlayerInfo.AILevel.HUMAN})
@@ -196,7 +206,7 @@ func _kick(reason: String) -> void:
 
 
 func add_ai(level: int) -> void:
-	if is_host and seats.size() < MAX_PLAYERS and not in_game:
+	if is_host and seats.size() < max_players() and not in_game:
 		seats.append({"peer": 0, "name": "IA %d" % (seats.size() + 1), "ai": level})
 		_sync_lobby()
 
@@ -212,19 +222,20 @@ func remove_seat(index: int) -> void:
 
 
 func _sync_lobby() -> void:
-	_update_lobby.rpc(seats)
+	_update_lobby.rpc(seats, game_id)
 	lobby_changed.emit()
 
 
 @rpc("authority", "reliable")
-func _update_lobby(p_seats: Array) -> void:
+func _update_lobby(p_seats: Array, p_game_id: String) -> void:
 	seats = p_seats
+	game_id = p_game_id
 	lobby_changed.emit()
 
 
 ## Anfitrión: reparte la partida a todos y empieza.
 func start_game() -> void:
-	if not is_host or seats.size() < 2:
+	if not is_host or seats.size() < min_players() or seats.size() > max_players():
 		return
 	in_game = true
 	var players: Array = []

@@ -33,6 +33,8 @@ var _ai_pending := false
 var _ai_generation := 0
 var _network := false
 var _local_seat := -1
+## Cliente: esperando a que el anfitrión confirme nuestra jugada.
+var _awaiting_host := false
 ## Hay varias personas en este equipo: lo privado necesita cortina.
 var _hotseat_private := false
 ## Única persona de este equipo (-1 si hay varias o ninguna): ve su
@@ -90,8 +92,11 @@ func _ready() -> void:
 	Net.action_received.connect(_on_net_action)
 	Net.action_requested.connect(_on_net_request)
 	Net.action_rejected.connect(func(message: String) -> void:
+		_awaiting_host = false
 		_error_label.text = message
-		Sfx.play(&"error"))
+		Sfx.play(&"error")
+		_refresh())
+	Net.seat_replaced.connect(_on_seat_replaced)
 	_start(App.session_seed())
 
 
@@ -147,7 +152,8 @@ func _create_ais(seed: int) -> void:
 	var autoplay := OS.get_environment("BGC_AUTOPLAY") == "1"
 	for p in game.players:
 		var runs_here := p.is_ai and (not _network or Net.is_host)
-		if runs_here or (autoplay and not p.is_ai):
+		var local_human := not p.is_ai and (not _network or p.id == _local_seat)
+		if runs_here or (autoplay and local_human):
 			_ais[p.id] = ConjuraAI.new(p.id, p.ai_level if p.is_ai else PlayerInfo.AILevel.NORMAL, seed)
 
 
@@ -794,6 +800,8 @@ func _ai_actor() -> int:
 # --- Interfaz -> acciones -----------------------------------------------------------
 
 func _submit(type: StringName, data: Dictionary, pid: int) -> void:
+	if _awaiting_host:
+		return  # ya hay una jugada nuestra camino del anfitrión
 	var error := _send(GameAction.new(type, pid, data))
 	_error_label.text = error
 	if error != "":
@@ -808,6 +816,8 @@ func _send(action: GameAction) -> String:
 		var error := game.validate(action)
 		if error == "":
 			Net.request_action(action.to_dict())
+			if not game.players[action.player_id].is_ai:
+				_awaiting_host = true
 		return error
 	return game.submit(action)
 
@@ -820,9 +830,22 @@ func _on_net_request(data: Dictionary, peer_id: int) -> void:
 		Net.reject(peer_id, error)
 
 
+## Un jugador se ha desconectado: pasa a jugar una IA (en el anfitrión).
+func _on_seat_replaced(seat: int) -> void:
+	if not _network or game == null:
+		return
+	game.players[seat].ai_level = PlayerInfo.AILevel.NORMAL
+	if Net.is_host:
+		_ais[seat] = ConjuraAI.new(seat, PlayerInfo.AILevel.NORMAL, game.rng.seed_value)
+	_add_log("[color=#ffd166]%s se ha desconectado: ahora juega una IA.[/color]" % game.players[seat].display_name)
+	_refresh()
+
+
 func _on_net_action(data: Dictionary) -> void:
 	if not _network or Net.is_host:
 		return
+	if int(data.get("player", -1)) == _local_seat:
+		_awaiting_host = false
 	var error := game.submit(GameAction.from_dict(data))
 	if error != "":
 		_add_log("[color=#ff8a80]Desincronización con el anfitrión: %s[/color]" % error)

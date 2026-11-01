@@ -10,6 +10,7 @@ const COLUMN_WIDTH := 580.0
 ## Filas de jugadores visibles sin desplazar (y su altura aproximada).
 const MAX_VISIBLE_ROWS := 5
 const PLAYER_ROW_HEIGHT := 54.0
+const LOBBY_ROW_HEIGHT := 58.0
 
 var _pages: Control
 var _games_box: VBoxContainer
@@ -435,7 +436,8 @@ func _refresh_hosts() -> void:
 	for ip in Net.hosts:
 		var h: Dictionary = Net.hosts[ip]
 		var full: bool = h["players"] >= h["max"]
-		var b := _button("Unirse a la partida de %s   (%d/%d)   %s" % [h["name"], h["players"], h["max"], ip], _on_join.bind(ip), "", 42)
+		var game_name: String = GameRegistry.find(String(h.get("game", ""))).get("name", "?")
+		var b := _button("%s: partida de %s   (%d/%d)   %s" % [game_name, h["name"], h["players"], h["max"], ip], _on_join.bind(ip), "", 42)
 		b.disabled = full
 		_hosts_list.add_child(b)
 
@@ -475,7 +477,18 @@ func _on_lobby_changed() -> void:
 		var ips := Net.local_addresses()
 		var where := ", ".join(ips) if not ips.is_empty() else "desconocida"
 		_lobby_box.add_child(_label("Los demás pueden encontrar la partida en la lista o unirse con tu IP: %s" % where, 14, BGCTheme.TEXT_DIM))
-	_lobby_box.add_child(_section("Jugadores (%d/%d)" % [Net.seats.size(), Net.MAX_PLAYERS]))
+	var lobby_game := GameRegistry.find(Net.game_id)
+	_lobby_box.add_child(_label(lobby_game.get("name", ""), 18, BGCTheme.ACCENT))
+	_lobby_box.add_child(_section("Jugadores (%d/%d)" % [Net.seats.size(), Net.max_players()]))
+	# Con muchos jugadores, la lista se desplaza para que quepa en pantalla.
+	var seats_scroll := ScrollContainer.new()
+	seats_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	seats_scroll.custom_minimum_size.y = minf(Net.seats.size(), MAX_VISIBLE_ROWS) * LOBBY_ROW_HEIGHT
+	_lobby_box.add_child(seats_scroll)
+	var seats_box := VBoxContainer.new()
+	seats_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	seats_box.add_theme_constant_override("separation", 6)
+	seats_scroll.add_child(seats_box)
 	for i in Net.seats.size():
 		var seat: Dictionary = Net.seats[i]
 		var row_panel := PanelContainer.new()
@@ -502,8 +515,8 @@ func _on_lobby_changed() -> void:
 		if Net.is_host and i > 0:
 			var remove := _button("Quitar", Net.remove_seat.bind(i), "GhostButton", 32)
 			row.add_child(remove)
-		_lobby_box.add_child(row_panel)
-	if Net.is_host and Net.seats.size() < Net.MAX_PLAYERS:
+		seats_box.add_child(row_panel)
+	if Net.is_host and Net.seats.size() < Net.max_players():
 		var add_row := HBoxContainer.new()
 		add_row.add_theme_constant_override("separation", 8)
 		var level := OptionButton.new()
@@ -526,8 +539,8 @@ func _on_lobby_changed() -> void:
 		var start := _button("Empezar partida", Net.start_game, "PrimaryButton", 50)
 		start.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		start.size_flags_stretch_ratio = 2.0
-		start.disabled = Net.seats.size() < 2
-		start.tooltip_text = "Hacen falta al menos 2 jugadores" if start.disabled else ""
+		start.disabled = Net.seats.size() < Net.min_players()
+		start.tooltip_text = "Hacen falta al menos %d jugadores (añade IAs si faltan)" % Net.min_players() if start.disabled else ""
 		buttons.add_child(start)
 	else:
 		var waiting := _label("Esperando a que el anfitrión empiece…", 15, BGCTheme.TEXT_DIM)

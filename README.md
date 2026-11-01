@@ -150,9 +150,13 @@ Funcionamiento (`core/net.gd`, autoload `Net`, con ENet de Godot):
   anfitrión, los demás vuelven al menú.
 - El anfitrión se anuncia por difusión UDP (puerto 47811) y la partida usa
   el puerto 47810. Si un cortafuegos los bloquea, hay que permitirlos.
-- Cada equipo solo muestra la mano de su jugador, pero tiene la partida
-  completa en memoria: está pensado para jugar entre amigos, no para
-  evitar trampas.
+- Cada juego fija su número de jugadores (Archipiélago 2–4, La Conjura
+  5–10); si faltan personas, el anfitrión completa la mesa con IAs.
+- Varios jugadores pueden actuar a la vez (las votaciones de La Conjura):
+  el anfitrión acepta la jugada de cualquier asiento al que le toque.
+- Cada equipo solo muestra la información de su jugador (la mano, o el rol
+  y los secretos en La Conjura), pero tiene la partida completa en memoria:
+  está pensado para jugar entre amigos, no para evitar trampas.
 - Para probar en un solo ordenador: abre dos ventanas del juego, crea la
   partida en una y únete desde la otra con la IP `127.0.0.1`. Con la
   variable de entorno `BGC_AUTOPLAY=1`, los jugadores humanos de esa
@@ -168,8 +172,8 @@ vista pública. Los tests comprueban que no se filtra nada.
 
 En un solo equipo con varias personas, todo lo secreto aparece tras una
 cortina de «Pasa el dispositivo a X». Si solo hay una persona (y el resto
-son IA), su rol se ve siempre en el panel derecho. La red local para este
-juego llegará en la Fase 4 (por ahora el menú solo ofrece jugar en un equipo).
+son IA), su rol se ve siempre en el panel derecho. En red, cada equipo
+enseña solo lo de su asiento y no hace falta cortina.
 
 ### Sonido
 
@@ -230,5 +234,8 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       Equilibrado con simulaciones: entre IAs normales la Guardia gana
       ~55 % (cada número de jugadores entre 45 y 64 %); la IA difícil gana
       ~5 puntos más que la normal.
-- [ ] **La Conjura, fase 4: red local.** Votos de varios asientos a la vez.
+- [x] **La Conjura, fase 4: red local.** Hasta 10 jugadores por red (el
+      límite lo pone cada juego), votos simultáneos, ventana privada por
+      asiento y una IA ocupa el sitio de quien se desconecta. Probado con un
+      anfitrión y dos clientes: todos terminan con el mismo historial.
 - [ ] **La Conjura, fase 5: pulido.** Arte, sonido e historial final.
