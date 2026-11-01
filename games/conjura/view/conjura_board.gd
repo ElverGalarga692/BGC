@@ -71,13 +71,15 @@ func _draw() -> void:
 	_meter(Vector2(col_w * 0.5, y), "Descontento", int(view["discontent"]), D.MAX_DISCONTENT, D.COLOR_NEUTRAL)
 	_meter(Vector2(col_w * 1.5, y), "Crisis", int(view["crisis"]), D.MAX_CRISIS, Color("e07a3c"))
 	_text(Vector2(col_w * 2, y + 16), "Mazo: %d   Descarte: %d" % [view["deck_count"], view["discard_count"]], 15, TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER, col_w)
-	_text(Vector2(col_w * 2, y + 40), "(19 edictos: 6 G · 10 S · 3 N)", 12, Color(TEXT_DIM, 0.7), HORIZONTAL_ALIGNMENT_CENTER, col_w)
+	var sombra_cards: int = D.DECK[Edict.SOMBRA] + D.EXTRA_SOMBRA.get(int(view["player_count"]), 0)
+	var total: int = D.DECK[Edict.GUARDIA] + sombra_cards + D.DECK[Edict.NEUTRAL]
+	_text(Vector2(col_w * 2, y + 40), "(%d edictos: %d G · %d S · %d N)" % [total, D.DECK[Edict.GUARDIA], sombra_cards, D.DECK[Edict.NEUTRAL]], 12, Color(TEXT_DIM, 0.7), HORIZONTAL_ALIGNMENT_CENTER, col_w)
 
 
 func _government_text() -> String:
 	var regent := int(view["regent"])
 	var text := "Regente: %s" % _name(regent)
-	if int(view["council"]) >= 0 and view["phase"] in [ConjuraGame.Phase.REGENT_DISCARD, ConjuraGame.Phase.COUNCIL_ENACT, ConjuraGame.Phase.CHOOSE_POWER, ConjuraGame.Phase.USE_POWER]:
+	if int(view["council"]) >= 0 and view["phase"] in [ConjuraGame.Phase.REGENT_DISCARD, ConjuraGame.Phase.COUNCIL_ENACT, ConjuraGame.Phase.CLAIMS, ConjuraGame.Phase.CHOOSE_POWER, ConjuraGame.Phase.USE_POWER]:
 		text += "    Consejero: %s" % _name(int(view["council"]))
 	elif int(view["nominee"]) >= 0:
 		text += "    Nominado: %s" % _name(int(view["nominee"]))

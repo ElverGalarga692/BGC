@@ -21,7 +21,7 @@ const Faction := ConjuraDefs.Faction
 const Edict := ConjuraDefs.Edict
 const Power := ConjuraDefs.Power
 
-enum Phase { NOMINATE, VOTE, REGENT_DISCARD, COUNCIL_ENACT, CHOOSE_POWER, USE_POWER, FINISHED }
+enum Phase { NOMINATE, VOTE, REGENT_DISCARD, COUNCIL_ENACT, CLAIMS, CHOOSE_POWER, USE_POWER, FINISHED }
 
 const NOMINATE := &"nominate"          # {"target": int}
 const VOTE := &"vote"                  # {"yes": bool}
@@ -29,12 +29,16 @@ const DISCARD := &"discard"            # {"index": int} (Regente, de sus 3 edict
 const ENACT := &"enact"                # {"index": int} (Consejero, de sus 2 edictos)
 const CHOOSE_POWER := &"choose_power"  # {"index": int} (de las 2 opciones)
 const USE_POWER := &"use_power"        # {"target": int} (-1 si el poder no lo necesita)
+## Declaración pública tras la legislatura (puede ser mentira):
+## {"cards": [edictos]} (3 el Regente, 2 el Consejero) o {"cards": null} para callar.
+const CLAIM := &"claim"
 
 const PHASE_NAMES := {
 	Phase.NOMINATE: "Nominación",
 	Phase.VOTE: "Votación",
 	Phase.REGENT_DISCARD: "Legislatura: Regente",
 	Phase.COUNCIL_ENACT: "Legislatura: Consejero",
+	Phase.CLAIMS: "Declaraciones",
 	Phase.CHOOSE_POWER: "Elegir poder",
 	Phase.USE_POWER: "Usar poder",
 	Phase.FINISHED: "Fin de la partida",
@@ -107,6 +111,8 @@ func _on_setup() -> void:
 	for edict in D.DECK:
 		for i in D.DECK[edict]:
 			draw_pile.append(edict)
+	for i in D.EXTRA_SOMBRA.get(n, 0):
+		draw_pile.append(Edict.SOMBRA)
 	rng.shuffle(draw_pile)
 	discard_pile.clear()
 	power_deck.clear()
@@ -147,6 +153,12 @@ func players_to_act() -> Array[int]:
 					result.append(pid)
 		Phase.COUNCIL_ENACT, Phase.CHOOSE_POWER, Phase.USE_POWER:
 			result.append(council)
+		Phase.CLAIMS:
+			var claims: Dictionary = governments[-1]["claims"]
+			if not claims.has("regent"):
+				result.append(regent)
+			if not claims.has("council"):
+				result.append(council)
 	return result
 
 
@@ -297,9 +309,38 @@ func validate(action: GameAction) -> String:
 					return "Objetivo no válido"
 			elif target != -1:
 				return "Este poder no necesita objetivo"
+		CLAIM:
+			if phase != Phase.CLAIMS:
+				return "Ahora no se declara"
+			if not pid in players_to_act():
+				return "No te toca declarar"
+			var cards = action.data.get("cards")
+			if cards == null:
+				return ""
+			if not cards is Array or cards.size() != (D.HAND_SIZE if pid == regent else D.HAND_SIZE - 1):
+				return "Declaración no válida"
+			for c in cards:
+				if not (c is int or c is float) or int(c) < 0 or int(c) > Edict.NEUTRAL:
+					return "Declaración no válida"
 		_:
 			return "Acción no soportada: %s" % action.type
 	return ""
+
+
+## Todas las declaraciones posibles de `size` edictos (ordenadas).
+static func claim_options(size: int) -> Array:
+	var result: Array = []
+	for g in range(size, -1, -1):
+		for s in range(size - g, -1, -1):
+			var cards: Array[int] = []
+			for i in g:
+				cards.append(Edict.GUARDIA)
+			for i in s:
+				cards.append(Edict.SOMBRA)
+			for i in size - g - s:
+				cards.append(Edict.NEUTRAL)
+			result.append(cards)
+	return result
 
 
 func get_legal_actions(pid: int) -> Array[GameAction]:
@@ -322,6 +363,11 @@ func get_legal_actions(pid: int) -> Array[GameAction]:
 		Phase.CHOOSE_POWER:
 			for i in power_options.size():
 				result.append(GameAction.new(CHOOSE_POWER, pid, {"index": i}))
+		Phase.CLAIMS:
+			var size := D.HAND_SIZE if pid == regent else D.HAND_SIZE - 1
+			for cards in claim_options(size):
+				result.append(GameAction.new(CLAIM, pid, {"cards": cards}))
+			result.append(GameAction.new(CLAIM, pid, {"cards": null}))
 		Phase.USE_POWER:
 			if D.power_needs_target(pending_power):
 				for t in power_targets():
@@ -350,7 +396,8 @@ func _apply(action: GameAction) -> void:
 			regent_discarded = hand[index]
 			discard_pile.append(hand[index])
 			hand.remove_at(index)
-			knowledge[council].append({"kind": "received", "cards": hand.duplicate(), "regent": regent, "round": governments.size()})
+			knowledge[council].append({"kind": "received", "cards": hand.duplicate(), "regent": regent, "round": governments.size() - 1})
+			knowledge[regent][-1]["passed"] = hand.duplicate()
 			phase = Phase.COUNCIL_ENACT
 			event.emit(&"regent_discarded", {"regent": regent})
 		ENACT:
@@ -371,6 +418,21 @@ func _apply(action: GameAction) -> void:
 			event.emit(&"power_chosen", {"council": council, "power": pending_power})
 		USE_POWER:
 			_use_power(int(action.data.get("target", -1)))
+		CLAIM:
+			var cards = action.data.get("cards")
+			var claim = null
+			if cards != null:
+				var sorted_cards: Array[int] = []
+				for c in cards:
+					sorted_cards.append(int(c))
+				sorted_cards.sort()
+				claim = sorted_cards
+			var claims: Dictionary = governments[-1]["claims"]
+			claims["regent" if pid == regent else "council"] = claim
+			event.emit(&"claimed", {"player": pid, "as_regent": pid == regent, "cards": claim})
+			if claims.size() == 2:
+				event.emit(&"claims_done", {"consistent": claims_consistent(governments[-1])})
+				_after_claims()
 
 
 func _resolve_vote() -> void:
@@ -381,7 +443,7 @@ func _resolve_vote() -> void:
 	var approved := yes * 2 > votes.size()
 	last_votes = votes.duplicate()
 	votes.clear()
-	governments.append({"regent": regent, "nominee": nominee, "votes": last_votes.duplicate(), "approved": approved, "edict": -1, "crisis": false})
+	governments.append({"regent": regent, "nominee": nominee, "votes": last_votes.duplicate(), "approved": approved, "edict": -1, "crisis": false, "claims": {}})
 	event.emit(&"vote_result", {"approved": approved, "votes": last_votes.duplicate(), "yes": yes})
 	if not approved:
 		nominee = -1
@@ -442,7 +504,13 @@ func _enact(edict: int, from_crisis: bool) -> void:
 		_win(faction, "El pueblo se ha rebelado: gana la facción con menos edictos (Guardia %d, Sombra %d)." % [guardia_edicts, sombra_edicts])
 		return
 	if from_crisis:
-		return
+		return  # _resolve_vote pasa a la siguiente ronda
+	# Tras promulgar, Regente y Consejero declaran lo que vieron.
+	phase = Phase.CLAIMS
+
+
+func _after_claims() -> void:
+	var edict: int = governments[-1]["edict"]
 	if edict == Edict.SOMBRA and sombra_edicts >= D.POWER_FROM:
 		power_options.clear()
 		power_options.append(power_deck.pop_front())
@@ -465,13 +533,13 @@ func _use_power(target: int) -> void:
 			knowledge[council].append({"kind": "faction", "target": target, "faction": faction_of(target)})
 		Power.AUGURIO:
 			_ensure_cards(D.HAND_SIZE)
-			knowledge[council].append({"kind": "top", "cards": draw_pile.slice(0, D.HAND_SIZE)})
+			knowledge[council].append({"kind": "top", "cards": draw_pile.slice(0, D.HAND_SIZE), "round": governments.size()})
 		Power.SUCESION:
 			special_regent = target
 		Power.DESTIERRO:
 			alive[target] = false
 		Power.PESQUISA:
-			knowledge[council].append({"kind": "discarded", "card": regent_discarded, "regent": regent})
+			knowledge[council].append({"kind": "discarded", "card": regent_discarded, "regent": regent, "round": governments.size() - 1})
 	event.emit(&"power_used", {"council": council, "power": power, "target": target})
 	if power == Power.DESTIERRO:
 		event.emit(&"banished", {"target": target})
@@ -524,3 +592,39 @@ func _win(faction: int, reason: String) -> void:
 		if faction_of(i) == faction:
 			winners.append(i)
 	finish(winners)
+
+
+## Declaraciones de un gobierno que no pueden ser todas ciertas:
+## "council" (el Consejero no declara el edicto promulgado), "regent" (el
+## Regente tampoco lo tenía) o "pair" (lo que dice uno no cuadra con el otro).
+## Devuelve [] si todo es coherente.
+static func claim_conflicts(gov: Dictionary) -> Array[String]:
+	var result: Array[String] = []
+	var claims: Dictionary = gov.get("claims", {})
+	var edict: int = gov.get("edict", -1)
+	var rc = claims.get("regent")
+	var cc = claims.get("council")
+	if cc != null and not edict in cc:
+		result.append("council")
+	if rc != null and not edict in rc:
+		result.append("regent")
+	if rc != null and cc != null and not can_pass(rc, cc):
+		result.append("pair")
+	return result
+
+
+static func claims_consistent(gov: Dictionary) -> bool:
+	return claim_conflicts(gov).is_empty()
+
+
+## true si quitando un edicto de `drawn` (3) quedan exactamente `passed` (2).
+static func can_pass(drawn: Array, passed: Array) -> bool:
+	for i in drawn.size():
+		var rest := drawn.duplicate()
+		rest.remove_at(i)
+		rest.sort()
+		var p := passed.duplicate()
+		p.sort()
+		if rest == p:
+			return true
+	return false

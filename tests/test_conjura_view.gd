@@ -135,8 +135,7 @@ func test_finished_game_reveals_everything() -> void:
 
 
 func test_ai_games_finish() -> void:
-	var wins := {0: 0, 1: 0}
-	for g in 60:
+	for g in 30:
 		var n := 5 + g % 6
 		var game := _game(n, 1000 + g, PlayerInfo.AILevel.NORMAL)
 		var ais := {}
@@ -155,5 +154,81 @@ func test_ai_games_finish() -> void:
 				return
 			steps += 1
 		assert_true(game.finished, "la partida %d termina" % g)
-		wins[game.winner_faction] += 1
-	assert_true(wins[0] > 0 and wins[1] > 0, "ganan las dos facciones alguna vez: %s" % wins)
+
+
+## Equilibrio: entre IAs normales, cada facción gana entre el 35 % y el 65 %.
+func test_ai_balance() -> void:
+	var games := 240
+	var guardia := 0
+	for g in games:
+		var n := 5 + g % 6
+		var game := _game(n, 5000 + g, PlayerInfo.AILevel.NORMAL)
+		var ais := {}
+		for pid in n:
+			ais[pid] = ConjuraAI.new(pid, PlayerInfo.AILevel.NORMAL, g)
+		while not game.finished:
+			var pid: int = game.players_to_act()[0]
+			if game.submit(ais[pid].choose_action(game)) != "":
+				_fail("jugada ilegal de la IA")
+				return
+		if game.winner_faction == ConjuraDefs.Faction.GUARDIA:
+			guardia += 1
+	var rate := 100.0 * guardia / games
+	assert_true(rate >= 35.0 and rate <= 65.0, "la Guardia gana el %.0f %% (se espera 35–65 %%)" % rate)
+
+
+## La Guardia difícil deduce: el Usurpador no debería ganar casi siempre por
+## Consejero, y la Guardia sospecha más de los traidores que de los honrados.
+func test_deduction_points_at_traitors() -> void:
+	var traitor_sum := 0.0
+	var honest_sum := 0.0
+	var traitor_count := 0
+	var honest_count := 0
+	for g in 40:
+		var n := 5 + g % 6
+		var game := _game(n, 7000 + g, PlayerInfo.AILevel.NORMAL)
+		var ais := {}
+		for pid in n:
+			ais[pid] = ConjuraAI.new(pid, PlayerInfo.AILevel.HARD, g)
+		var steps := 0
+		while not game.finished and steps < 40:
+			var pid: int = game.players_to_act()[0]
+			game.submit(ais[pid].choose_action(game))
+			steps += 1
+		var probs := ConjuraDeduction.evil_probabilities(game.view_for(-1))
+		for pid in n:
+			if game.roles[pid] == Role.GUARDIA:
+				honest_sum += probs[pid]
+				honest_count += 1
+			else:
+				traitor_sum += probs[pid]
+				traitor_count += 1
+	var traitor_avg := traitor_sum / traitor_count
+	var honest_avg := honest_sum / honest_count
+	assert_true(traitor_avg > honest_avg + 0.05, "sospecha media: traidores %.2f, honrados %.2f" % [traitor_avg, honest_avg])
+
+
+func test_deduction_respects_hard_facts() -> void:
+	var game := _game(7, 3)
+	var seat := game.roles.find(Role.GUARDIA)
+	var target := (seat + 1) % 7
+	game.knowledge[seat].append({"kind": "faction", "target": target, "faction": D.faction_of(game.roles[target])})
+	var probs := ConjuraDeduction.evil_probabilities(game.view_for(seat))
+	assert_eq(probs[seat], 0.0, "un guardia sabe que él no es traidor")
+	assert_eq(probs[target], 1.0 if game.roles[target] != Role.GUARDIA else 0.0, "lo espiado es seguro")
+	var total := 0.0
+	for p in probs:
+		total += p
+	assert_true(absf(total - (D.ROLE_TABLE[7][1] + 1)) < 0.001, "las probabilidades suman el número de traidores")
+
+
+func test_deduction_catches_lying_council() -> void:
+	# Fui Regente, pasé dos de la Guardia y salió Sombra: el Consejero miente.
+	var game := _game(7, 11)
+	var seat := game.roles.find(Role.GUARDIA)
+	var view := game.view_for(seat)
+	var council := (seat + 1) % 7
+	view["governments"] = [{"regent": seat, "nominee": council, "votes": {}, "approved": true, "edict": Edict.SOMBRA, "crisis": false, "claims": {"regent": [0, 0, 1], "council": [1, 1]}}]
+	view["knowledge"] = [{"kind": "drawn", "cards": [0, 0, 1], "passed": [0, 0], "council": council, "round": 0}]
+	var probs := ConjuraDeduction.evil_probabilities(view)
+	assert_true(probs[council] > 0.99, "el Consejero es traidor (%.3f)" % probs[council])

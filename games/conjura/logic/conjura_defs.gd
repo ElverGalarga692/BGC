@@ -19,7 +19,10 @@ const ROLE_TABLE := {
 const USURPER_KNOWS_ALLIES_MAX := 6
 
 ## Mazo de edictos.
-const DECK := {Edict.GUARDIA: 6, Edict.SOMBRA: 10, Edict.NEUTRAL: 3}
+const DECK := {Edict.GUARDIA: 6, Edict.SOMBRA: 11, Edict.NEUTRAL: 3}
+## Con 6 u 8 jugadores la Sombra es proporcionalmente más pequeña: su mazo
+## lleva edictos extra de la Sombra (equilibrado con simulaciones).
+const EXTRA_SOMBRA := {6: 3, 8: 3}
 ## Mazo de poderes.
 const POWER_DECK := {
 	Power.ESPIAR: 3, Power.AUGURIO: 2, Power.SUCESION: 2, Power.DESTIERRO: 2, Power.PESQUISA: 2,

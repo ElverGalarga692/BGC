@@ -44,6 +44,15 @@ func _govern(game: ConjuraGame, edict: int) -> void:
 	_vote_all(game, true)
 	assert_eq(_do(game, G.DISCARD, game.regent, {"index": 0}), "")
 	assert_eq(_do(game, G.ENACT, game.council, {"index": 0}), "")
+	_claim_silent(game)
+
+
+## Regente y Consejero no declaran nada (si la partida sigue).
+func _claim_silent(game: ConjuraGame) -> void:
+	if game.phase != G.Phase.CLAIMS:
+		return
+	assert_eq(_do(game, G.CLAIM, game.regent, {"cards": null}), "")
+	assert_eq(_do(game, G.CLAIM, game.council, {"cards": null}), "")
 
 
 ## Pone el rol de cada jugador a mano: [rol0, rol1, ...].
@@ -66,7 +75,10 @@ func test_role_distribution() -> void:
 
 func test_decks() -> void:
 	var game := _game()
-	assert_eq(game.draw_pile.size(), 19)
+	assert_eq(game.draw_pile.size(), 20)
+	assert_eq(game.draw_pile.count(Edict.SOMBRA), 11)
+	assert_eq(_game(6).draw_pile.count(Edict.SOMBRA), 14, "con 6 jugadores hay edictos extra de la Sombra")
+	assert_eq(_game(7).draw_pile.size(), 20)
 	assert_eq(game.draw_pile.count(Edict.NEUTRAL), 3)
 	assert_eq(game.power_deck.size(), 11)
 	assert_eq(game.phase, G.Phase.NOMINATE)
@@ -130,8 +142,11 @@ func test_legislation_flow() -> void:
 	assert_eq(game.guardia_edicts, 1)
 	assert_eq(game.discard_pile.size(), 2)
 	assert_eq(game.last_council, target)
+	assert_eq(game.phase, G.Phase.CLAIMS, "tras promulgar se declara")
+	assert_eq(game.knowledge[regent][-1]["passed"], [Edict.GUARDIA, Edict.NEUTRAL] as Array[int], "el Regente recuerda qué pasó")
+	_claim_silent(game)
 	assert_eq(game.phase, G.Phase.NOMINATE)
-	assert_eq(game.draw_pile.size() + game.discard_pile.size() + game.guardia_edicts, 22, "19 + los 3 añadidos")
+	assert_eq(game.draw_pile.size() + game.discard_pile.size() + game.guardia_edicts, 23, "20 + los 3 añadidos")
 
 
 func test_neutral_raises_discontent() -> void:
@@ -182,7 +197,7 @@ func test_reshuffle_when_deck_is_short() -> void:
 	_nominate_any(game)
 	_vote_all(game, true)
 	assert_eq(game.hand.size(), 3)
-	assert_eq(game.draw_pile.size() + game.hand.size(), 19)
+	assert_eq(game.draw_pile.size() + game.hand.size(), 20)
 	assert_eq(game.discard_pile.size(), 0)
 
 
@@ -376,3 +391,60 @@ func test_save_and_replay_is_identical() -> void:
 	assert_eq(copy.phase, game.phase)
 	assert_eq(copy.governments, game.governments)
 	assert_eq(copy.knowledge, game.knowledge)
+
+
+func _legislate(game: ConjuraGame, top: Array) -> void:
+	for i in range(top.size() - 1, -1, -1):
+		game.draw_pile.push_front(top[i])
+	_nominate_any(game)
+	_vote_all(game, true)
+	_do(game, G.DISCARD, game.regent, {"index": 0})
+	_do(game, G.ENACT, game.council, {"index": 0})
+
+
+func test_claims_are_public_and_unvalidated() -> void:
+	var game := _game()
+	_legislate(game, [Edict.SOMBRA, Edict.GUARDIA, Edict.SOMBRA])
+	var regent := game.regent
+	var council := game.council
+	assert_eq(game.players_to_act(), [regent, council] as Array[int])
+	assert_ne(_do(game, G.CLAIM, regent, {"cards": [Edict.GUARDIA, Edict.GUARDIA]}), "", "el Regente declara 3")
+	assert_ne(_do(game, G.CLAIM, (council + 1) % 5 if (council + 1) % 5 != regent else (council + 2) % 5, {"cards": null}), "", "solo declaran Regente y Consejero")
+	# Mentira: se acepta (nadie lo comprueba).
+	assert_eq(_do(game, G.CLAIM, regent, {"cards": [Edict.SOMBRA, Edict.SOMBRA, Edict.SOMBRA]}), "")
+	assert_ne(_do(game, G.CLAIM, regent, {"cards": null}), "", "no se declara dos veces")
+	assert_eq(_do(game, G.CLAIM, council, {"cards": [Edict.SOMBRA, Edict.GUARDIA]}), "")
+	var claims: Dictionary = game.view_for(-1)["governments"][-1]["claims"]
+	assert_eq(claims["regent"], [1, 1, 1] as Array[int], "la mentira queda registrada")
+	assert_eq(claims["council"], [0, 1] as Array[int])
+	assert_eq(game.phase, G.Phase.NOMINATE)
+
+
+func test_claim_conflicts() -> void:
+	var gov := {"edict": Edict.SOMBRA, "claims": {"regent": [0, 1, 1], "council": [1, 1]}}
+	assert_true(G.claims_consistent(gov))
+	gov["claims"] = {"regent": [0, 0, 1], "council": [1, 1]}
+	assert_eq(G.claim_conflicts(gov), ["pair"] as Array[String])
+	gov["claims"] = {"regent": [0, 0, 0], "council": [0, 0]}
+	assert_eq(G.claim_conflicts(gov), ["council", "regent"] as Array[String])
+	gov["claims"] = {"regent": null, "council": [0, 2]}
+	assert_eq(G.claim_conflicts(gov), ["council"] as Array[String])
+	assert_true(G.can_pass([0, 1, 2], [2, 0]))
+	assert_false(G.can_pass([0, 1, 2], [1, 1]))
+
+
+func test_crisis_skips_claims() -> void:
+	var game := _game()
+	for i in 3:
+		_nominate_any(game)
+		_vote_all(game, false)
+	assert_eq(game.phase, G.Phase.NOMINATE)
+
+
+func test_power_comes_after_claims() -> void:
+	var game := _game()
+	game.sombra_edicts = 1
+	_legislate(game, [Edict.SOMBRA, Edict.SOMBRA, Edict.SOMBRA])
+	assert_eq(game.phase, G.Phase.CLAIMS)
+	_claim_silent(game)
+	assert_eq(game.phase, G.Phase.CHOOSE_POWER)

@@ -368,7 +368,7 @@ func _refresh_players(pub: Dictionary) -> void:
 			tags.append("Regente")
 		if p.id == pub["nominee"]:
 			tags.append("Nominado")
-		if p.id == pub["council"] and phase in [Phase.REGENT_DISCARD, Phase.COUNCIL_ENACT, Phase.CHOOSE_POWER, Phase.USE_POWER]:
+		if p.id == pub["council"] and phase in [Phase.REGENT_DISCARD, Phase.COUNCIL_ENACT, Phase.CLAIMS, Phase.CHOOSE_POWER, Phase.USE_POWER]:
 			tags.append("Consejero")
 		if phase != Phase.VOTE and p.id == pub["last_council"] and p.id != pub["council"]:
 			tags.append("ex-Consejero")
@@ -420,6 +420,30 @@ func _refresh_actions(pub: Dictionary) -> void:
 		Phase.COUNCIL_ENACT:
 			_prompt_label.text = "%s (Consejero) elige en secreto qué edicto promulgar." % council
 			_private_hint(actor)
+		Phase.CLAIMS:
+			_prompt_label.text = "%s (Regente) y %s (Consejero) cuentan qué edictos vieron. Pueden mentir." % [regent, council]
+			var claims: Dictionary = pub["governments"][-1]["claims"]
+			for key in ["regent", "council"]:
+				if claims.has(key):
+					var who := regent if key == "regent" else council
+					_actions_box.add_child(_label("%s: %s" % [who, _claim_text(claims[key], key == "regent")], 14, BGCTheme.TEXT_DIM))
+			if actor >= 0:
+				var as_regent: bool = actor == pub["regent"]
+				_actions_box.add_child(_label("%s, ¿qué dices que %s?" % [_player_name_plain(actor), "robaste" if as_regent else "te pasó el Regente"], 15, BGCTheme.ACCENT))
+				var grid := GridContainer.new()
+				grid.columns = 2
+				grid.add_theme_constant_override("h_separation", 6)
+				grid.add_theme_constant_override("v_separation", 6)
+				for cards in G.claim_options(D.HAND_SIZE if as_regent else D.HAND_SIZE - 1):
+					var b := _button(_cards_count_text(cards), func() -> void: _submit(G.CLAIM, {"cards": cards}, actor), 13)
+					b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+					grid.add_child(b)
+				_actions_box.add_child(grid)
+				_actions_box.add_child(_button("No decir nada", func() -> void: _submit(G.CLAIM, {"cards": null}, actor), 13, "GhostButton"))
+				if _hotseat_private:
+					_actions_box.add_child(_button("Recordar en privado lo que vi", func() -> void:
+						_private_queue.push_front({"seat": actor, "kind": "info"})
+						_refresh(), 13, "GhostButton"))
 		Phase.CHOOSE_POWER:
 			_prompt_label.text = "Edicto de la Sombra: %s (Consejero) elige un poder." % council
 			for i in pub["power_options"].size():
@@ -623,7 +647,8 @@ func _fill_identity(box: VBoxContainer, seat: int, font_size: int) -> void:
 	box.add_child(role_panel)
 	var allies: Array[String] = []
 	for pid in known:
-		if pid != seat:
+		var ally: bool = D.faction_of(known[pid]) == Faction.SOMBRA and D.faction_of(role) == Faction.SOMBRA
+		if pid != seat and ally and not game.finished:
 			allies.append("%s (%s)" % [game.players[pid].display_name, D.ROLE_NAMES[known[pid]]])
 	if not allies.is_empty():
 		box.add_child(_label("Tus aliados: " + ", ".join(allies), font_size - 1, D.COLOR_SOMBRA.lightened(0.4)))
@@ -658,10 +683,29 @@ func _describe_knowledge(k: Dictionary) -> String:
 		"discarded":
 			return "Pesquisa: %s (Regente) descartó un %s." % [_player_name_plain(k["regent"]), D.EDICT_NAMES[k["card"]]]
 		"drawn":
-			return "Como Regente (con %s) robaste: %s." % [_player_name_plain(k["council"]), _cards_text(k["cards"])]
+			var text := "Como Regente (con %s) robaste: %s" % [_player_name_plain(k["council"]), _cards_text(k["cards"])]
+			if k.has("passed"):
+				text += "; pasaste: %s" % _cards_text(k["passed"])
+			return text + "."
 		"received":
 			return "Como Consejero (de %s) recibiste: %s." % [_player_name_plain(k["regent"]), _cards_text(k["cards"])]
 	return str(k)
+
+
+## «2 Guardia, 1 Sombra» (para las declaraciones).
+func _cards_count_text(cards: Array) -> String:
+	var parts: Array[String] = []
+	for edict in [Edict.GUARDIA, Edict.SOMBRA, Edict.NEUTRAL]:
+		var count := cards.count(edict)
+		if count > 0:
+			parts.append("%d %s" % [count, D.EDICT_SHORT[edict]])
+	return ", ".join(parts)
+
+
+func _claim_text(cards, as_regent: bool) -> String:
+	if cards == null:
+		return "no dice nada"
+	return "%s %s" % ["dice que robó" if as_regent else "dice que recibió", _cards_count_text(cards)]
 
 
 func _cards_text(cards: Array) -> String:
@@ -812,6 +856,12 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 			var result := "[color=#8fd694]APROBADO[/color]" if data["approved"] else "[color=#ff8a80]RECHAZADO[/color]"
 			_add_log("Votación: %s (%d a %d). Sí: %s. No: %s." % [result, yes_names.size(), no_names.size(), _join(yes_names), _join(no_names)])
 			Sfx.play(&"trade" if data["approved"] else &"error")
+		&"claimed":
+			var role_name := "Regente" if data["as_regent"] else "Consejero"
+			_add_log("%s (%s) %s." % [_player_name(data["player"]), role_name, _claim_text(data["cards"], data["as_regent"])])
+		&"claims_done":
+			if not data["consistent"]:
+				_add_log("[color=#e07a3c][b]Las declaraciones no cuadran: alguien miente.[/b][/color]")
 		&"crisis":
 			_add_log("[b][color=#e07a3c]¡Crisis![/color][/b] Tres votaciones fallidas: se promulga el primer edicto del mazo y sube el descontento.")
 			Sfx.play(&"robber")

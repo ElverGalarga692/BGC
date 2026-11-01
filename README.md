@@ -87,7 +87,8 @@ games/conjura/
     conjura_defs.gd      Roles, edictos, poderes, reparto y umbrales de victoria
     conjura_game.gd      La partida (GameBase): fases, votación, legislatura,
                          crisis, poderes y view_for(seat)
-    conjura_ai.gd        IA básica (solo usa view_for: no hace trampa)
+    conjura_deduction.gd Deducción: probabilidad de que cada uno sea traidor
+    conjura_ai.gd        IA (solo usa view_for: no hace trampa); miente y deduce
   view/
     conjura_board.gd     Tablero público: pistas, descontento, crisis, mazo
     conjura_screen.gd    Pantalla: jugadores, registro, acciones y ventana
@@ -223,7 +224,11 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       asiento (`view_for`), votación simultánea, crisis, poderes elegibles,
       descontento y cuatro formas de ganar; tests de reglas y de filtrado;
       pantalla jugable en un equipo con cortina para lo secreto e IA básica.
-- [ ] **La Conjura, fase 3: IA.** Declaraciones (verdad o mentira),
-      deducción y equilibrio de victorias entre facciones.
+- [x] **La Conjura, fase 3: IA.** Fase de declaraciones (verdad o
+      mentira), deducción exacta por enumeración de repartos y IA por rol
+      (la Sombra miente coordinada y mide cuánto sospechan de ella).
+      Equilibrado con simulaciones: entre IAs normales la Guardia gana
+      ~55 % (cada número de jugadores entre 45 y 64 %); la IA difícil gana
+      ~5 puntos más que la normal.
 - [ ] **La Conjura, fase 4: red local.** Votos de varios asientos a la vez.
 - [ ] **La Conjura, fase 5: pulido.** Arte, sonido e historial final.
