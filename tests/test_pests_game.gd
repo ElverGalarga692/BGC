@@ -84,7 +84,7 @@ func test_quick_setup_infests_house() -> void:
 	var g := _game(4)
 	assert_eq(g.phase, G.Phase.QUEEN)
 	assert_eq(g.turns.current, g.start_player)
-	assert_eq(g.queen_rolls_left, 2, "el primer turno la reina tira dos veces")
+	assert_eq(g.queen_steps.size(), 2, "el primer turno la reina tira dos veces")
 	assert_eq(g.house.room_count(), 1 + 16 + 4)
 	for pid in 4:
 		var sp := g.species(pid)
@@ -108,10 +108,25 @@ func test_choose_species_counterclockwise() -> void:
 	_rejected(g, G.CHOOSE_SPECIES, g.turns.current, {"species": D.Species.PURPLE})
 	_ok(g, G.CHOOSE_SPECIES, g.turns.current, {"species": D.Species.RED})
 	_ok(g, G.CHOOSE_SPECIES, g.turns.current, {"species": D.Species.BLUE})
+	assert_eq(g.species(s), D.Species.PURPLE)
+	# Elección de cartas: empieza el último en elegir exterminador (s + 1) y
+	# sigue en sentido horario hasta 4 cartas cada uno.
+	assert_eq(g.phase, G.Phase.DRAFT)
+	assert_eq(g.draft_pool.size(), 24)
+	assert_eq(g.turns.current, (s + 1) % 3)
+	_rejected(g, G.DRAFT_CARD, g.turns.current, {"card": "nope"})
+	_ok(g, G.DRAFT_CARD, g.turns.current, {"card": "zap"})
+	assert_eq(g.turns.current, (s + 2) % 3)
+	_rejected(g, G.DRAFT_CARD, g.turns.current, {"card": "zap"})
+	while g.phase == G.Phase.DRAFT:
+		var pid := g.turns.current
+		_ok(g, G.DRAFT_CARD, pid, {"card": g.draft_pool[0]})
+	for pid in 3:
+		assert_eq(g.hands[pid].size(), 4)
+	assert_true("zap" in g.hands[(s + 1) % 3])
+	assert_eq(g.deck.size(), 24 - 12)
 	assert_eq(g.phase, G.Phase.QUEEN)
 	assert_eq(g.turns.current, s)
-	assert_eq(g.species(s), D.Species.PURPLE)
-	assert_eq(g.get_legal_actions(s).size(), 1)
 
 
 func test_manual_tile_placement() -> void:
@@ -513,11 +528,11 @@ func test_first_turn_rolls_twice_then_once() -> void:
 	_ok(g, G.END_TURN, p)
 	var q := g.turns.current
 	assert_ne(q, p)
-	assert_eq(g.queen_rolls_left, 2, "el primer turno del segundo jugador también es doble")
+	assert_eq(g.queen_steps.size(), 2, "el primer turno del segundo jugador también es doble")
 	_ok(g, G.ROLL_QUEEN, q)
 	_ok(g, G.ROLL_QUEEN, q)
 	_ok(g, G.END_TURN, q)
-	assert_eq(g.queen_rolls_left, 1)
+	assert_eq(g.queen_steps.size(), 1)
 	assert_eq(g.turns.round_number, 2)
 
 
@@ -540,7 +555,12 @@ func _play_random(g: PestsGame, rng: BGCRng, max_actions: int) -> int:
 
 
 func _check_conservation(g: PestsGame) -> void:
-	if g.phase in [G.Phase.CHOOSE_SPECIES, G.Phase.PLACE_TILES]:
+	var cards := g.deck.size() + g.discard.size() + g.draft_pool.size() + g.played_this_turn.size() + g.effects.size()
+	for h in g.hands:
+		cards += h.size()
+	if cards != 24 and g.phase != G.Phase.CHOOSE_SPECIES:
+		assert_eq(cards, 24, "se conservan las cartas")
+	if g.phase in [G.Phase.CHOOSE_SPECIES, G.Phase.DRAFT, G.Phase.PLACE_TILES]:
 		return
 	for pid in g.players.size():
 		if g.eliminated[pid]:

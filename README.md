@@ -87,7 +87,7 @@ games/pests/             Pests! (en desarrollo: aún no aparece en el menú)
     pests_house_generator.gd  Casas aleatorias (partida rápida, IA, tests)
     pests_game.gd        La partida (GameBase): elección de exterminador,
                          construcción de la casa, reina, acciones, trampas,
-                         victoria y eliminación (sin cartas todavía)
+                         cartas de herramientas, victoria y eliminación
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 

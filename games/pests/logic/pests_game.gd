@@ -1,16 +1,23 @@
 class_name PestsGame
 extends GameBase
-## Lógica de una partida de Pests! (sin cartas de herramientas todavía).
+## Lógica de una partida de Pests!
 ##
 ## Fases:
 ##   CHOOSE_SPECIES  cada jugador elige exterminador, en sentido antihorario
-##                   desde el jugador inicial (se salta con "quick_species").
+##                   desde el jugador inicial.
+##   DRAFT           se eligen las cartas de herramientas boca arriba, una a
+##                   una en sentido horario empezando por el último en elegir
+##                   exterminador, hasta tener 4 cada uno.
 ##   PLACE_TILES     se construye la casa loseta a loseta, en sentido horario
-##                   desde el jugador inicial (se salta con "auto_house").
-##   QUEEN           el jugador tira el dado de su reina (dos veces en su
-##                   primer turno).
+##                   desde el jugador inicial.
+##   QUEEN           el jugador activa a su reina (dos veces en su primer
+##                   turno). Antes de la primera tirada puede jugar las cartas
+##                   "antes de tirar" (Las plagas hibernan, Control mental).
 ##   EXTERMINATOR    movimiento gratis + 2 puntos de acción; termina con END_TURN.
 ##   FINISHED
+##
+## Con la opción "quick_species" (reglas rápidas) los exterminadores y las
+## cartas se reparten al azar; con "auto_house" la casa se construye al azar.
 ##
 ## El jugador inicial elige exterminador el primero, coloca la primera loseta
 ## y juega el primer turno (con el orden del reglamento siempre coincide).
@@ -23,11 +30,12 @@ signal event(kind: StringName, data: Dictionary)
 
 const D := preload("res://games/pests/logic/pests_defs.gd")
 
-enum Phase { CHOOSE_SPECIES, PLACE_TILES, QUEEN, EXTERMINATOR, FINISHED }
+enum Phase { CHOOSE_SPECIES, DRAFT, PLACE_TILES, QUEEN, EXTERMINATOR, FINISHED }
 
 const CHOOSE_SPECIES := &"choose_species"  # {"species": int}
+const DRAFT_CARD := &"draft_card"          # {"card": id}
 const PLACE_TILE := &"place_tile"          # {"index": int, "x": int, "y": int, "rotation": int}
-const ROLL_QUEEN := &"roll_queen"
+const ROLL_QUEEN := &"roll_queen"          # activa la reina (tira el dado o usa la acción elegida)
 const MOVE := &"move"                      # {"room": int}
 const EXTERMINATE := &"exterminate"
 const DROP_TRAP := &"drop_trap"            # {"target": "queen" | "pests"} (opcional, por defecto la reina)
@@ -36,18 +44,21 @@ const DRAG_TRAP := &"drag_trap"            # {"trap": id, "room": int}
 const SEAL_NEST := &"seal_nest"
 const DESTROY_TRAP := &"destroy_trap"      # {"trap": id}
 const UNSEAL_NEST := &"unseal_nest"
+const PLAY_CARD := &"play_card"            # {"card": id, ...objetivos} (ver _card_target_error)
+const BUY_CARD := &"buy_card"
 const END_TURN := &"end_turn"
 
 const PHASE_ACTIONS := {
 	Phase.CHOOSE_SPECIES: [CHOOSE_SPECIES],
+	Phase.DRAFT: [DRAFT_CARD],
 	Phase.PLACE_TILES: [PLACE_TILE],
-	Phase.QUEEN: [ROLL_QUEEN],
-	Phase.EXTERMINATOR: [MOVE, EXTERMINATE, DROP_TRAP, EMPTY_TRAP, DRAG_TRAP, SEAL_NEST, DESTROY_TRAP, UNSEAL_NEST, END_TURN],
+	Phase.QUEEN: [ROLL_QUEEN, PLAY_CARD],
+	Phase.EXTERMINATOR: [MOVE, EXTERMINATE, DROP_TRAP, EMPTY_TRAP, DRAG_TRAP, SEAL_NEST, DESTROY_TRAP,
+		UNSEAL_NEST, PLAY_CARD, BUY_CARD, END_TURN],
 	Phase.FINISHED: [],
 }
 
-## Coste en PA de cada acción del exterminador (MOVE y las que dependen de la
-## especie se calculan en action_cost()).
+## Acción del exterminador correspondiente a cada tipo (para los costes).
 const ACTION_ACTS := {
 	MOVE: D.Act.MOVE,
 	EXTERMINATE: D.Act.EXTERMINATE,
@@ -57,12 +68,26 @@ const ACTION_ACTS := {
 	SEAL_NEST: D.Act.SEAL_NEST,
 	DESTROY_TRAP: D.Act.DESTROY_TRAP,
 	UNSEAL_NEST: D.Act.UNSEAL_NEST,
+	PLAY_CARD: D.Act.PLAY_CARD,
+	BUY_CARD: D.Act.BUY_CARD,
 }
+
+## Cartas que se quedan delante del jugador afectado hasta su próximo turno.
+const NEXT_TURN_EFFECTS := ["angry_queen", "stuck", "royal_persuasion"]
+## Cartas de efecto duradero y su condición de descarte.
+const LASTING_EFFECTS := ["fertile", "two_by_two"]
+
+const BUG_BOMB_ALL := 9999
+const ZAP_PESTS := 3
+const SURGE_PESTS := 5
+const LESS_TO_INFEST_PESTS := 5
+const SPREADING_PESTS := 4
+const MORE_TIME_ACTIONS := 2
+const ENERGY_DRINK_MOVES := 4
+const MATING_CALL_STEPS := 2
 
 ## Opciones de la partida. Se fijan antes de setup() y se guardan con la
 ## partida.
-##   quick_species: reparte los exterminadores al azar.
-##   auto_house: construye la casa al azar.
 var options := {"quick_species": false, "auto_house": false}
 
 var phase: Phase = Phase.CHOOSE_SPECIES
@@ -95,10 +120,25 @@ var turns_taken: Array[int] = []
 var traps: Array[Dictionary] = []
 var _next_trap_id := 0
 
-## Turno en curso.
-var queen_rolls_left := 0
+## Cartas (por id de PestsDefs.CARDS): por jugador su mano, el mazo (se roba
+## del final), el descarte y las cartas boca arriba durante la elección.
+var hands: Array = []
+var deck: Array[String] = []
+var discard: Array[String] = []
+var draft_pool: Array[String] = []
+## Cartas jugadas este turno: van al descarte al terminar el turno.
+var played_this_turn: Array[String] = []
+## Cartas delante de un jugador: {"card", "source", "target", "action", "used"}.
+var effects: Array[Dictionary] = []
+
+## Turno en curso. queen_steps son las activaciones de la reina que quedan:
+## {"action": acción elegida o -1 para tirar, "repeat": veces que la hace}.
+var queen_steps: Array[Dictionary] = []
+var queen_steps_done := 0
 var free_move := false
 var action_points := 0
+## Movimientos gratis de la Bebida energética.
+var energy_moves := 0
 ## Última cara del dado de la reina (-1 si aún no ha salido ninguna) y última
 ## tirada del d6.
 var last_queen_face := -1
@@ -122,9 +162,19 @@ func _on_setup() -> void:
 	pests.clear()
 	traps.clear()
 	_next_trap_id = 0
-	queen_rolls_left = 0
+	hands.clear()
+	for i in n:
+		hands.append([])
+	deck.clear()
+	discard.clear()
+	draft_pool.clear()
+	played_this_turn.clear()
+	effects.clear()
+	queen_steps.clear()
+	queen_steps_done = 0
 	free_move = false
 	action_points = 0
+	energy_moves = 0
 	last_queen_face = -1
 	last_roll = 0
 	# Se tira el d6 para ver quién empieza.
@@ -136,6 +186,7 @@ func _on_setup() -> void:
 		rng.shuffle(all)
 		for i in n:
 			species_of[(start_player + i) % n] = all[i]
+		_deal_cards()
 		_begin_house()
 	else:
 		phase = Phase.CHOOSE_SPECIES
@@ -183,6 +234,15 @@ func active_players() -> Array[int]:
 	return result
 
 
+## Rivales que siguen en la partida.
+func opponents(pid: int) -> Array[int]:
+	var result: Array[int] = []
+	for other in active_players():
+		if other != pid:
+			result.append(other)
+	return result
+
+
 func available_species() -> Array[int]:
 	var result: Array[int] = []
 	for sp in D.SPECIES_COUNT:
@@ -219,6 +279,20 @@ func pests_in_traps(sp: int) -> int:
 		if trap_species(t) == sp:
 			total += t["pests"]
 	return total
+
+
+## Habitaciones con más plagas de una especie (vacío si no hay ninguna).
+func most_infested_rooms(sp: int) -> Array[int]:
+	var best := 0
+	var result: Array[int] = []
+	for r in pests.size():
+		var c: int = pests[r][sp]
+		if c > best:
+			best = c
+			result = [r]
+		elif c == best and c > 0:
+			result.append(r)
+	return result
 
 
 func trap_species(trap: Dictionary) -> int:
@@ -272,10 +346,45 @@ func nest_room(pid: int) -> int:
 	return house.nest_of(species_of[pid])
 
 
+## ¿Puede el jugador vaciar la trampa con su reina (y ganar)?
+func can_empty_queen_trap(pid: int) -> bool:
+	var sp := species_of[pid]
+	return sealed[sp] and pests_in_house(sp) == 0
+
+
+func hand(pid: int) -> Array:
+	return hands[pid]
+
+
+## Cartas delante de un jugador.
+func effects_on(pid: int) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for e in effects:
+		if e["target"] == pid:
+			result.append(e)
+	return result
+
+
+func has_effect(pid: int, card_id: String) -> bool:
+	for e in effects:
+		if e["target"] == pid and e["card"] == card_id:
+			return true
+	return false
+
+
+## ¿Se pueden jugar ahora las cartas "antes de tirar"?
+func before_roll_window() -> bool:
+	return phase == Phase.QUEEN and queen_steps_done == 0
+
+
 ## Coste en PA de una acción del exterminador.
 func action_cost(pid: int, type: StringName, data: Dictionary = {}) -> int:
 	if type == MOVE:
-		return 0 if free_move else 1
+		return 0 if (energy_moves > 0 or free_move) else 1
+	if type == PLAY_CARD:
+		var card := D.card(String(data.get("card", "")))
+		if not card.is_empty() and card["timing"] == D.CardTiming.BEFORE_ROLL:
+			return 0
 	if type == END_TURN or not ACTION_ACTS.has(type):
 		return 0
 	var owner_species := -1
@@ -303,9 +412,9 @@ func tile_options(pid: int) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if phase != Phase.PLACE_TILES or pid != turns.current:
 		return result
-	var hand: Array = tile_hands[pid]
-	for i in hand.size():
-		var tile: Dictionary = hand[i]
+	var tiles: Array = tile_hands[pid]
+	for i in tiles.size():
+		var tile: Dictionary = tiles[i]
 		var is_nest: bool = tile["kind"] == D.RoomKind.NEST
 		if is_nest and not nest_allowed(pid):
 			continue
@@ -335,11 +444,13 @@ func validate(action: GameAction) -> String:
 	if not type in PHASE_ACTIONS[phase]:
 		return _phase_hint()
 	if phase == Phase.EXTERMINATOR and type != END_TURN:
+		if energy_moves > 0 and type != MOVE:
+			return "Con la Bebida energética solo puedes moverte"
 		var cost := action_cost(pid, type, data)
 		if cost > action_points:
 			return "No te quedan puntos de acción suficientes (necesitas %d)" % cost
 	var sp := species_of[pid]
-	var here := exterminator_room[pid] if pid < exterminator_room.size() else -1
+	var here := exterminator_room[pid]
 	match type:
 		CHOOSE_SPECIES:
 			var s := int(data.get("species", -1))
@@ -347,6 +458,10 @@ func validate(action: GameAction) -> String:
 				return "Exterminador no válido"
 			if s in species_of:
 				return "Ese exterminador ya está elegido"
+			return ""
+		DRAFT_CARD:
+			if not String(data.get("card", "")) in draft_pool:
+				return "Esa carta no está disponible"
 			return ""
 		PLACE_TILE:
 			var wanted := {"index": int(data.get("index", -1)), "x": int(data.get("x", 0)),
@@ -378,8 +493,7 @@ func validate(action: GameAction) -> String:
 				return "No te quedan trampas"
 			if here == house.nest_of(sp):
 				return "No puedes soltar una trampa en tu nido"
-			var target := String(data.get("target", "queen"))
-			if not target in ["queen", "pests"]:
+			if not String(data.get("target", "queen")) in ["queen", "pests"]:
 				return "Objetivo de la trampa no válido"
 			return ""
 		EMPTY_TRAP:
@@ -388,9 +502,7 @@ func validate(action: GameAction) -> String:
 				return "Esa trampa no es tuya"
 			if t["room"] != here:
 				return "La trampa no está en tu habitación"
-			if t["queen"] and not can_empty_queen_trap(pid):
-				return "Para vaciar la trampa con tu reina necesitas el nido sellado y ninguna plaga tuya en la casa"
-			return ""
+			return _queen_trap_error(pid, t)
 		DRAG_TRAP:
 			var t := find_trap(int(data.get("trap", -1)))
 			if t.is_empty() or t["room"] != here:
@@ -418,23 +530,136 @@ func validate(action: GameAction) -> String:
 			if not sealed[nest_species]:
 				return "Ese nido no está sellado"
 			return ""
+		BUY_CARD:
+			if deck.is_empty() and discard.is_empty():
+				return "No quedan cartas"
+			return ""
+		PLAY_CARD:
+			return _play_card_error(pid, data)
 	return "Acción desconocida"
 
 
-## ¿Puede el jugador vaciar la trampa con su reina (y ganar)?
-func can_empty_queen_trap(pid: int) -> bool:
+func _queen_trap_error(pid: int, t: Dictionary) -> String:
+	if t["queen"] and not can_empty_queen_trap(pid):
+		return "Para vaciar la trampa con tu reina necesitas el nido sellado y ninguna plaga tuya en la casa"
+	return ""
+
+
+func _play_card_error(pid: int, data: Dictionary) -> String:
+	var card_id := String(data.get("card", ""))
+	var card := D.card(card_id)
+	if card.is_empty() or not card_id in hands[pid]:
+		return "No tienes esa carta"
+	if card["timing"] == D.CardTiming.BEFORE_ROLL:
+		if not before_roll_window():
+			return "Esta carta se juega antes de tirar el dado de tu reina"
+	elif phase != Phase.EXTERMINATOR:
+		return "Esta carta se juega en tu turno de exterminador"
+	return _card_target_error(pid, card_id, data)
+
+
+## Comprueba los objetivos de una carta. Datos según la carta:
+##   mind_control, royal_persuasion: "queen_action"
+##   colony_collapse, zap: "room"
+##   trap_remote: "trap" (propia); trap_breaks: "trap" (rival)
+##   cartas ofensivas: "player"; spreading además "room"
+##   dumpster_diver: "use" (carta ofensiva del descarte) y sus objetivos
+func _card_target_error(pid: int, card_id: String, data: Dictionary) -> String:
 	var sp := species_of[pid]
-	return sealed[sp] and pests_in_house(sp) == 0
+	var here := exterminator_room[pid]
+	var card := D.card(card_id)
+	if card["kind"] == D.CardKind.OFFENSIVE and card_id != "dumpster_diver":
+		var target := int(data.get("player", -1))
+		if not target in opponents(pid):
+			return "Elige a un rival"
+	var target_pid := int(data.get("player", -1))
+	var target_sp := species_of[target_pid] if target_pid >= 0 and target_pid < players.size() else -1
+	match card_id:
+		"more_time", "energy_drink", "mating_call", "hibernate":
+			return ""
+		"mind_control":
+			if not _valid_queen_action(data):
+				return "Elige la acción de la reina"
+			for step in queen_steps:
+				if step["action"] < 0:
+					return ""
+			return "La acción de tu reina ya está decidida"
+		"bug_bomb":
+			return "" if pests[here][sp] > 0 else "No hay plagas de tu color en tu habitación"
+		"colony_collapse":
+			var room := int(data.get("room", -1))
+			return "" if room in most_infested_rooms(sp) else "Elige la habitación con más plagas de tu color"
+		"zap":
+			var room := int(data.get("room", -1))
+			if room < 0 or room >= pests.size():
+				return "Elige una habitación"
+			return "" if pests[room][sp] > 0 else "No hay plagas de tu color en esa habitación"
+		"quik_trap":
+			if traps_available(pid) <= 0:
+				return "No te quedan trampas"
+			if here == house.nest_of(sp):
+				return "No puedes soltar una trampa en tu nido"
+			return ""
+		"quik_seal":
+			var nest_species := house.room_species[here]
+			if nest_species < 0 or player_of(nest_species) < 0 or eliminated[player_of(nest_species)]:
+				return "Tienes que estar en un nido"
+			return "Ese nido ya está sellado" if sealed[nest_species] else ""
+		"trap_remote":
+			var t := find_trap(int(data.get("trap", -1)))
+			if t.is_empty() or t["owner"] != pid:
+				return "Elige una de tus trampas"
+			return _queen_trap_error(pid, t)
+		"nesting":
+			if is_queen_trapped(sp):
+				return "Tu reina está atrapada"
+			return "Tu reina ya está en su nido" if queen_room[sp] == house.nest_of(sp) else ""
+		"unseal_nest":
+			return "" if sealed[target_sp] else "Ese nido no está sellado"
+		"trap_breaks":
+			var t := find_trap(int(data.get("trap", -1)))
+			if t.is_empty() or t["owner"] != target_pid:
+				return "Elige una trampa de ese jugador"
+			return ""
+		"pest_surge", "angry_queen", "stuck", "less_to_infest":
+			return ""
+		"royal_persuasion":
+			return "" if _valid_queen_action(data) else "Elige la acción de su reina"
+		"sabotage_tools":
+			return "" if not hands[target_pid].is_empty() else "Ese jugador no tiene cartas"
+		"spreading":
+			var room := int(data.get("room", -1))
+			if room < 0 or room >= pests.size() or pests[room][target_sp] <= 0:
+				return "Elige una habitación con plagas de ese jugador"
+			return ""
+		"two_by_two":
+			return "" if not sealed[target_sp] else "Su nido está sellado"
+		"fertile":
+			return "" if not is_queen_trapped(target_sp) else "Su reina está atrapada"
+		"dumpster_diver":
+			var used := String(data.get("use", ""))
+			var used_card := D.card(used)
+			if not used in discard or used_card.is_empty() or used_card["kind"] != D.CardKind.OFFENSIVE or used == "dumpster_diver":
+				return "Elige una carta ofensiva del descarte"
+			return _card_target_error(pid, used, data)
+	return "Carta desconocida"
+
+
+static func _valid_queen_action(data: Dictionary) -> bool:
+	var a := int(data.get("queen_action", -1))
+	return a >= 0 and a < D.QueenAction.size()
 
 
 func _phase_hint() -> String:
 	match phase:
 		Phase.CHOOSE_SPECIES:
 			return "Ahora toca elegir exterminador"
+		Phase.DRAFT:
+			return "Ahora toca elegir una carta"
 		Phase.PLACE_TILES:
 			return "Ahora toca colocar una loseta"
 		Phase.QUEEN:
-			return "Primero tira el dado de la reina"
+			return "Primero activa a tu reina"
 	return "Ahora no puedes hacer eso"
 
 
@@ -445,30 +670,29 @@ func _apply(action: GameAction) -> void:
 	var data := action.data
 	var type := action.type
 	if phase == Phase.EXTERMINATOR and type != END_TURN:
-		var cost := action_cost(pid, type, data)
-		if type == MOVE and free_move:
-			free_move = false
-		else:
-			action_points -= cost
-			free_move = false
+		_pay(pid, type, data)
 	match type:
 		CHOOSE_SPECIES:
 			species_of[pid] = int(data["species"])
 			event.emit(&"species_chosen", {"player": pid, "species": species_of[pid]})
 			turns.next()
 			if not turns.in_sequence():
+				_begin_draft()
+		DRAFT_CARD:
+			var card_id := String(data["card"])
+			draft_pool.erase(card_id)
+			hands[pid].append(card_id)
+			event.emit(&"card_drafted", {"player": pid, "card": card_id})
+			turns.next()
+			if not turns.in_sequence():
+				deck.assign(draft_pool)
+				draft_pool.clear()
+				rng.shuffle(deck)
 				_begin_house()
 		PLACE_TILE:
 			_apply_place_tile(pid, data)
 		ROLL_QUEEN:
-			var face := rng.randi_range(0, D.QUEEN_DIE.size() - 1)
-			data["face"] = face
-			resolve_queen_face(species_of[pid], face)
-			queen_rolls_left -= 1
-			if queen_rolls_left <= 0:
-				phase = Phase.EXTERMINATOR
-				free_move = true
-				action_points = D.ACTION_POINTS
+			_activate_queen(pid, data)
 		MOVE:
 			exterminator_room[pid] = int(data["room"])
 			event.emit(&"exterminator_moved", {"player": pid, "room": exterminator_room[pid]})
@@ -477,25 +701,9 @@ func _apply(action: GameAction) -> void:
 			data["roll"] = last_roll
 			data["removed"] = exterminate(pid, last_roll + int(ability(pid, "exterminate_bonus")))
 		DROP_TRAP:
-			var trap := {"id": _next_trap_id, "owner": pid, "room": exterminator_room[pid],
-				"pests": 0, "queen": false, "prefer_queen": String(data.get("target", "queen")) == "queen"}
-			_next_trap_id += 1
-			traps.append(trap)
-			data["trap"] = trap["id"]
-			event.emit(&"trap_dropped", {"player": pid, "trap": trap["id"], "room": trap["room"]})
-			_resolve_traps()
+			data["trap"] = _drop_trap(pid, String(data.get("target", "queen")) == "queen")
 		EMPTY_TRAP:
-			var t := find_trap(int(data["trap"]))
-			if t["queen"]:
-				traps.erase(t)
-				event.emit(&"queen_trap_emptied", {"player": pid})
-				phase = Phase.FINISHED
-				var winners: Array[int] = [pid]
-				finish(winners)
-				return
-			reserve[species_of[pid]] += t["pests"]
-			traps.erase(t)
-			event.emit(&"trap_emptied", {"player": pid, "pests": t["pests"]})
+			_empty_trap(pid, find_trap(int(data["trap"])))
 		DRAG_TRAP:
 			var t := find_trap(int(data["trap"]))
 			var room := int(data["room"])
@@ -504,8 +712,7 @@ func _apply(action: GameAction) -> void:
 			event.emit(&"trap_dragged", {"player": pid, "trap": t["id"], "room": room})
 			_resolve_traps()
 		SEAL_NEST:
-			sealed[species_of[pid]] = true
-			event.emit(&"nest_sealed", {"player": pid, "species": species_of[pid]})
+			_seal(species_of[pid], pid)
 		DESTROY_TRAP:
 			var t := find_trap(int(data["trap"]))
 			_release_trap(t)
@@ -515,8 +722,37 @@ func _apply(action: GameAction) -> void:
 			var nest_species := house.room_species[exterminator_room[pid]]
 			sealed[nest_species] = false
 			event.emit(&"nest_unsealed", {"player": pid, "species": nest_species})
+		BUY_CARD:
+			var card_id: String
+			if not deck.is_empty():
+				card_id = deck.pop_back()
+			else:
+				var i := rng.randi_range(0, discard.size() - 1)
+				card_id = discard[i]
+				discard.remove_at(i)
+			hands[pid].append(card_id)
+			event.emit(&"card_bought", {"player": pid})
+		PLAY_CARD:
+			var card_id := String(data["card"])
+			hands[pid].erase(card_id)
+			event.emit(&"card_played", {"player": pid, "card": card_id, "data": data.duplicate()})
+			_apply_card(pid, card_id, data)
 		END_TURN:
 			_end_turn(pid)
+
+
+## Paga el coste de una acción del exterminador.
+func _pay(pid: int, type: StringName, data: Dictionary) -> void:
+	if type == MOVE:
+		if energy_moves > 0:
+			energy_moves -= 1
+		elif free_move:
+			free_move = false
+		else:
+			action_points -= 1
+		return
+	action_points -= action_cost(pid, type, data)
+	free_move = false
 
 
 func _apply_place_tile(pid: int, data: Dictionary) -> void:
@@ -534,6 +770,148 @@ func _apply_place_tile(pid: int, data: Dictionary) -> void:
 	event.emit(&"tile_placed", {"player": pid, "room": room})
 	turns.current = (pid + 1) % players.size()
 	_prepare_tile_turn()
+
+
+# --- Cartas: reparto -------------------------------------------------------------
+
+## Reglas rápidas: se barajan las 24 cartas y se reparten 4 a cada jugador.
+func _deal_cards() -> void:
+	deck.clear()
+	for c in D.CARDS:
+		deck.append(c["id"])
+	rng.shuffle(deck)
+	for round_i in D.CARDS_PER_HAND:
+		for i in players.size():
+			hands[(start_player + i) % players.size()].append(deck.pop_back())
+
+
+## Elección de cartas: empieza el último en elegir exterminador y se sigue en
+## sentido horario hasta que todos tienen 4.
+func _begin_draft() -> void:
+	phase = Phase.DRAFT
+	draft_pool.clear()
+	for c in D.CARDS:
+		draft_pool.append(c["id"])
+	var n := players.size()
+	var first := (start_player + 1) % n
+	var order: Array[int] = []
+	for i in n * D.CARDS_PER_HAND:
+		order.append((first + i) % n)
+	turns.begin_sequence(order, start_player)
+
+
+# --- Cartas: efectos -------------------------------------------------------------
+
+func _apply_card(pid: int, card_id: String, data: Dictionary) -> void:
+	var sp := species_of[pid]
+	var here := exterminator_room[pid]
+	var target := int(data.get("player", -1))
+	var target_sp := species_of[target] if target >= 0 else -1
+	if card_id in NEXT_TURN_EFFECTS or card_id in LASTING_EFFECTS:
+		effects.append({"card": card_id, "source": pid, "target": target,
+			"action": int(data.get("queen_action", -1)), "used": false})
+		return
+	if card_id != "dumpster_diver":
+		played_this_turn.append(card_id)
+	match card_id:
+		"more_time":
+			action_points += MORE_TIME_ACTIONS
+		"hibernate":
+			queen_steps.clear()
+			event.emit(&"queen_hibernates", {"species": sp})
+			_begin_exterminator(pid)
+		"mind_control":
+			for step in queen_steps:
+				if step["action"] < 0:
+					step["action"] = int(data["queen_action"])
+					break
+		"mating_call":
+			summon(sp, here, MATING_CALL_STEPS)
+		"colony_collapse":
+			var room := int(data["room"])
+			_remove_pests(pid, room, ceili(pests[room][sp] / 2.0))
+		"bug_bomb":
+			_remove_pests(pid, here, BUG_BOMB_ALL)
+		"energy_drink":
+			action_points = 0
+			free_move = false
+			energy_moves = ENERGY_DRINK_MOVES
+		"quik_trap":
+			var trap_id := _drop_trap(pid, pests[here][sp] == 0)
+			var t := find_trap(trap_id)
+			if not t.is_empty() and _queen_trap_error(pid, t) == "":
+				_empty_trap(pid, t)
+		"quik_seal":
+			_seal(house.room_species[here], pid)
+		"trap_remote":
+			_empty_trap(pid, find_trap(int(data["trap"])))
+		"nesting":
+			queen_room[sp] = house.nest_of(sp)
+			event.emit(&"queen_moved", {"species": sp, "room": queen_room[sp], "reentered": false})
+			_resolve_traps()
+		"zap":
+			_remove_pests(pid, int(data["room"]), ZAP_PESTS)
+		"unseal_nest":
+			sealed[target_sp] = false
+			event.emit(&"nest_unsealed", {"player": pid, "species": target_sp})
+		"trap_breaks":
+			var t := find_trap(int(data["trap"]))
+			_release_trap(t)
+			event.emit(&"trap_destroyed", {"player": pid, "owner": t["owner"], "room": t["room"]})
+			_resolve_traps()
+		"pest_surge":
+			var nest := house.nest_of(target_sp)
+			var added := _add_pests(target_sp, nest, SURGE_PESTS)
+			event.emit(&"nest_spawned", {"species": target_sp, "room": nest, "count": added})
+			_resolve_traps()
+		"sabotage_tools":
+			var i := rng.randi_range(0, hands[target].size() - 1)
+			var lost: String = hands[target][i]
+			hands[target].remove_at(i)
+			discard.append(lost)
+			data["discarded"] = lost
+			event.emit(&"card_discarded", {"player": target, "card": lost})
+		"less_to_infest":
+			var n := mini(LESS_TO_INFEST_PESTS, reserve[target_sp])
+			reserve[target_sp] -= n
+			pool[target_sp] -= n
+			event.emit(&"pests_removed", {"species": target_sp, "count": n})
+		"spreading":
+			var spread := house.spread(int(data["room"]), SPREADING_PESTS)
+			var placed := {}
+			for r in spread:
+				placed[r] = _add_pests(target_sp, r, spread[r])
+			event.emit(&"pests_spread", {"species": target_sp, "rooms": placed})
+			_resolve_traps()
+		"dumpster_diver":
+			played_this_turn.append(card_id)
+			var used := String(data["use"])
+			discard.erase(used)
+			event.emit(&"card_played", {"player": pid, "card": used, "data": data.duplicate()})
+			_apply_card(pid, used, data)
+
+
+## Quita plagas propias de una habitación (vuelven a la reserva).
+func _remove_pests(pid: int, room: int, count: int) -> int:
+	var sp := species_of[pid]
+	var removed := mini(count, pests[room][sp])
+	pests[room][sp] -= removed
+	reserve[sp] += removed
+	event.emit(&"pests_exterminated", {"player": pid, "room": room, "count": removed})
+	return removed
+
+
+func _discard_effect(e: Dictionary) -> void:
+	effects.erase(e)
+	discard.append(e["card"])
+	event.emit(&"effect_ended", {"card": e["card"], "player": e["target"]})
+
+
+## Descarta las cartas `card_id` que tiene delante el jugador.
+func _discard_effects(target: int, card_id: String) -> void:
+	for e in effects.duplicate():
+		if e["target"] == target and e["card"] == card_id:
+			_discard_effect(e)
 
 
 # --- Construcción de la casa ------------------------------------------------------
@@ -595,8 +973,8 @@ func _prepare_tile_turn() -> void:
 
 
 func _all_tiles_placed() -> bool:
-	for hand in tile_hands:
-		if not hand.is_empty():
+	for tiles in tile_hands:
+		if not tiles.is_empty():
 			return false
 	return true
 
@@ -627,16 +1005,61 @@ func _infest() -> void:
 func _start_turn(pid: int) -> void:
 	turns.current = pid
 	phase = Phase.QUEEN
-	queen_rolls_left = 2 if turns_taken[pid] == 0 else 1
 	free_move = false
 	action_points = 0
+	energy_moves = 0
+	queen_steps_done = 0
+	queen_steps.clear()
+	for i in (2 if turns_taken[pid] == 0 else 1):
+		queen_steps.append({"action": -1, "repeat": 1})
+	for e in effects_on(pid):
+		match e["card"]:
+			"royal_persuasion":
+				queen_steps[0]["action"] = e["action"]
+				e["used"] = true
+			"angry_queen":
+				queen_steps[0]["repeat"] = 2
+				e["used"] = true
 	event.emit(&"turn_started", {"player": pid})
+
+
+func _activate_queen(pid: int, data: Dictionary) -> void:
+	var sp := species_of[pid]
+	var step: Dictionary = queen_steps.pop_front()
+	queen_steps_done += 1
+	if step["action"] >= 0:
+		data["chosen"] = step["action"]
+		resolve_queen_choice(sp, step["action"], step["repeat"])
+	else:
+		var face := rng.randi_range(0, D.QUEEN_DIE.size() - 1)
+		data["face"] = face
+		resolve_queen_face(sp, face, step["repeat"])
+	if queen_steps.is_empty():
+		_begin_exterminator(pid)
+
+
+func _begin_exterminator(pid: int) -> void:
+	phase = Phase.EXTERMINATOR
+	free_move = true
+	action_points = D.ACTION_POINTS
+	energy_moves = 0
+	for e in effects_on(pid):
+		if e["card"] == "stuck":
+			free_move = false
+			action_points = 1
+			e["used"] = true
 
 
 func _end_turn(pid: int) -> void:
 	turns_taken[pid] += 1
 	free_move = false
 	action_points = 0
+	energy_moves = 0
+	discard.append_array(played_this_turn)
+	played_this_turn.clear()
+	for e in effects_on(pid):
+		if e["used"]:
+			_discard_effect(e)
 	if _check_elimination(pid):
 		var alive := active_players()
 		if alive.size() <= 1:
@@ -652,8 +1075,8 @@ func _end_turn(pid: int) -> void:
 	_start_turn(next)
 
 
+## ¿Pasa el turno por el jugador inicial al ir de `from` a `to`?
 func _wrapped(from: int, to: int) -> bool:
-	# ¿Pasa el turno por el jugador inicial al ir de `from` a `to`?
 	var n := players.size()
 	var i := (from + 1) % n
 	while true:
@@ -666,7 +1089,8 @@ func _wrapped(from: int, to: int) -> bool:
 
 
 ## Si al final de su turno todas las plagas disponibles del jugador están en
-## la casa, queda eliminado y sus piezas salen del tablero.
+## la casa, queda eliminado: sus piezas salen del tablero y sus cartas van al
+## descarte.
 func _check_elimination(pid: int) -> bool:
 	var sp := species_of[pid]
 	if reserve[sp] > 0 or pests_in_traps(sp) > 0 or pests_in_house(sp) == 0:
@@ -679,45 +1103,65 @@ func _check_elimination(pid: int) -> bool:
 			traps.remove_at(i)
 	queen_room[sp] = -1
 	sealed[sp] = false
+	for card_id in hands[pid]:
+		discard.append(card_id)
+	hands[pid].clear()
+	for e in effects_on(pid):
+		_discard_effect(e)
 	event.emit(&"player_eliminated", {"player": pid, "species": sp})
 	return true
 
 
 # --- La reina ---------------------------------------------------------------------
 
-## Resuelve una cara del dado de la reina de la especie `sp`: acción, plagas
-## que suelta y plagas que salen del nido.
-func resolve_queen_face(sp: int, face: int) -> void:
+## Resuelve una tirada del dado de la reina de la especie `sp`.
+func resolve_queen_face(sp: int, face: int, repeat: int = 1) -> void:
 	last_queen_face = face
 	var f: Dictionary = D.QUEEN_DIE[face]
-	var action: int = f["action"]
-	event.emit(&"queen_rolled", {"species": sp, "face": face, "action": action})
+	event.emit(&"queen_rolled", {"species": sp, "face": face, "action": f["action"]})
+	_resolve_queen(sp, f["action"], f["species"], repeat)
+
+
+## Resuelve una acción elegida (Control mental, Persuasión real). Sin tirada
+## no sale ningún color, así que una reina atrapada no escapa.
+func resolve_queen_choice(sp: int, action: int, repeat: int = 1) -> void:
+	event.emit(&"queen_chosen", {"species": sp, "action": action})
+	_resolve_queen(sp, action, -1, repeat)
+
+
+## Acción de la reina (`repeat` veces, por la Reina furiosa), plagas que
+## suelta y plagas que salen del nido (una sola vez).
+func _resolve_queen(sp: int, action: int, color: int, repeat: int) -> void:
 	var trap := queen_trap(sp)
 	if not trap.is_empty():
-		if f["species"] == sp:
+		if color == sp:
 			traps.erase(trap)
 			event.emit(&"queen_escaped", {"species": sp, "room": queen_room[sp]})
 			_queen_drop(sp, D.QUEEN_DROP)
 		_nest_spawn(sp)
 		_resolve_traps()
 		return
-	var performed := true
-	match action:
-		D.QueenAction.SUMMON:
-			performed = summon(sp, queen_room[sp], 1)
-			_queen_drop(sp, D.QUEEN_DROP if performed else D.QUEEN_ANGRY_DROP)
-		D.QueenAction.POPULATE:
-			var spread := house.spread(queen_room[sp], D.POPULATE_COUNT,
-				int(D.ability(sp, "populate_distance")), _through_walls(sp))
-			var placed := {}
-			for r in spread:
-				placed[r] = _add_pests(sp, r, spread[r])
-			event.emit(&"queen_populated", {"species": sp, "rooms": placed})
-		_:
-			performed = _queen_move(sp, D.queen_action_dir(action))
-			_queen_drop(sp, D.QUEEN_DROP if performed else D.QUEEN_ANGRY_DROP)
-	if not performed:
-		event.emit(&"queen_angry", {"species": sp})
+	for i in repeat:
+		if is_queen_trapped(sp):
+			break
+		var performed := true
+		match action:
+			D.QueenAction.SUMMON:
+				performed = summon(sp, queen_room[sp], 1)
+				_queen_drop(sp, D.QUEEN_DROP if performed else D.QUEEN_ANGRY_DROP)
+			D.QueenAction.POPULATE:
+				var spread := house.spread(queen_room[sp], D.POPULATE_COUNT,
+					int(D.ability(sp, "populate_distance")), _through_walls(sp))
+				var placed := {}
+				for r in spread:
+					placed[r] = _add_pests(sp, r, spread[r])
+				event.emit(&"queen_populated", {"species": sp, "rooms": placed})
+			_:
+				performed = _queen_move(sp, D.queen_action_dir(action))
+				_queen_drop(sp, D.QUEEN_DROP if performed else D.QUEEN_ANGRY_DROP)
+		if not performed:
+			event.emit(&"queen_angry", {"species": sp})
+		_resolve_traps()
 	_nest_spawn(sp)
 	_resolve_traps()
 
@@ -772,7 +1216,8 @@ func summon(sp: int, target: int, steps: int) -> bool:
 
 
 func _queen_drop(sp: int, count: int) -> void:
-	var added := _add_pests(sp, queen_room[sp], count)
+	var extra := 1 if has_effect(player_of(sp), "fertile") else 0
+	var added := _add_pests(sp, queen_room[sp], count + extra)
 	event.emit(&"queen_dropped", {"species": sp, "room": queen_room[sp], "count": added})
 
 
@@ -780,8 +1225,15 @@ func _nest_spawn(sp: int) -> void:
 	if sealed[sp]:
 		return
 	var nest := house.nest_of(sp)
-	var added := _add_pests(sp, nest, int(D.ability(sp, "nest_spawn")))
+	var extra := 1 if has_effect(player_of(sp), "two_by_two") else 0
+	var added := _add_pests(sp, nest, int(D.ability(sp, "nest_spawn")) + extra)
 	event.emit(&"nest_spawned", {"species": sp, "room": nest, "count": added})
+
+
+func _seal(sp: int, by: int) -> void:
+	sealed[sp] = true
+	event.emit(&"nest_sealed", {"player": by, "species": sp})
+	_discard_effects(player_of(sp), "two_by_two")
 
 
 # --- Plagas y trampas -------------------------------------------------------------
@@ -799,17 +1251,34 @@ func _add_pests(sp: int, room: int, count: int) -> int:
 ## Quita hasta `count` plagas propias de la habitación del exterminador y las
 ## devuelve a la reserva. Devuelve cuántas quitó.
 func exterminate(pid: int, count: int) -> int:
-	var sp := species_of[pid]
-	var room := exterminator_room[pid]
-	var removed := mini(count, pests[room][sp])
-	pests[room][sp] -= removed
-	reserve[sp] += removed
-	event.emit(&"pests_exterminated", {"player": pid, "room": room, "count": removed})
-	return removed
+	return _remove_pests(pid, exterminator_room[pid], count)
 
 
 func _through_walls(sp: int) -> bool:
 	return D.ability(sp, "through_walls")
+
+
+func _drop_trap(pid: int, prefer_queen: bool) -> int:
+	var trap := {"id": _next_trap_id, "owner": pid, "room": exterminator_room[pid],
+		"pests": 0, "queen": false, "prefer_queen": prefer_queen}
+	_next_trap_id += 1
+	traps.append(trap)
+	event.emit(&"trap_dropped", {"player": pid, "trap": trap["id"], "room": trap["room"]})
+	_resolve_traps()
+	return trap["id"]
+
+
+## Vacía una trampa propia. Si tenía a la reina, el jugador gana.
+func _empty_trap(pid: int, t: Dictionary) -> void:
+	traps.erase(t)
+	if t["queen"]:
+		event.emit(&"queen_trap_emptied", {"player": pid})
+		phase = Phase.FINISHED
+		var winners: Array[int] = [pid]
+		finish(winners)
+		return
+	reserve[species_of[pid]] += t["pests"]
+	event.emit(&"trap_emptied", {"player": pid, "pests": t["pests"]})
 
 
 ## Las trampas atrapan lo que haya de su color: la reina (si la trampa está
@@ -825,6 +1294,7 @@ func _resolve_traps() -> void:
 		if t["pests"] == 0 and queen_here and (t["prefer_queen"] or pests[room][sp] == 0):
 			t["queen"] = true
 			event.emit(&"queen_trapped", {"species": sp, "trap": t["id"], "room": room})
+			_discard_effects(t["owner"], "fertile")
 			continue
 		var space := trap_capacity(t) - int(t["pests"])
 		if space <= 0:
@@ -859,11 +1329,15 @@ func get_legal_actions(pid: int) -> Array[GameAction]:
 		Phase.CHOOSE_SPECIES:
 			for sp in available_species():
 				candidates.append(GameAction.new(CHOOSE_SPECIES, pid, {"species": sp}))
+		Phase.DRAFT:
+			for card_id in draft_pool:
+				candidates.append(GameAction.new(DRAFT_CARD, pid, {"card": card_id}))
 		Phase.PLACE_TILES:
 			for o in tile_options(pid):
 				candidates.append(GameAction.new(PLACE_TILE, pid, o.duplicate()))
 		Phase.QUEEN:
 			candidates.append(GameAction.new(ROLL_QUEEN, pid))
+			_card_candidates(pid, candidates)
 		Phase.EXTERMINATOR:
 			var here := exterminator_room[pid]
 			for r in house.neighbors(here):
@@ -880,11 +1354,76 @@ func get_legal_actions(pid: int) -> Array[GameAction]:
 					candidates.append(GameAction.new(DRAG_TRAP, pid, {"trap": t["id"], "room": r}))
 			candidates.append(GameAction.new(SEAL_NEST, pid))
 			candidates.append(GameAction.new(UNSEAL_NEST, pid))
+			candidates.append(GameAction.new(BUY_CARD, pid))
+			_card_candidates(pid, candidates)
 			candidates.append(GameAction.new(END_TURN, pid))
 	var result: Array[GameAction] = []
 	for a in candidates:
 		if validate(a) == "":
 			result.append(a)
+	return result
+
+
+func _card_candidates(pid: int, out: Array[GameAction]) -> void:
+	var seen := {}
+	for card_id in hands[pid]:
+		if seen.has(card_id):
+			continue
+		seen[card_id] = true
+		for targets in card_targets(pid, card_id):
+			var data: Dictionary = targets.duplicate()
+			data["card"] = card_id
+			out.append(GameAction.new(PLAY_CARD, pid, data))
+
+
+## Posibles objetivos de una carta (sin validar): lista de diccionarios de
+## datos para PLAY_CARD (sin la clave "card").
+func card_targets(pid: int, card_id: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	match card_id:
+		"mind_control":
+			for a in D.QueenAction.size():
+				result.append({"queen_action": a})
+		"colony_collapse":
+			for r in most_infested_rooms(species_of[pid]):
+				result.append({"room": r})
+		"zap":
+			for r in pests.size():
+				if pests[r][species_of[pid]] > 0:
+					result.append({"room": r})
+		"trap_remote":
+			for t in traps:
+				if t["owner"] == pid:
+					result.append({"trap": t["id"]})
+		"trap_breaks":
+			for t in traps:
+				if t["owner"] != pid:
+					result.append({"player": t["owner"], "trap": t["id"]})
+		"royal_persuasion":
+			for other in opponents(pid):
+				for a in D.QueenAction.size():
+					result.append({"player": other, "queen_action": a})
+		"spreading":
+			for other in opponents(pid):
+				for r in pests.size():
+					if pests[r][species_of[other]] > 0:
+						result.append({"player": other, "room": r})
+		"dumpster_diver":
+			var seen := {}
+			for used in discard:
+				if seen.has(used) or used == "dumpster_diver" or D.card(used)["kind"] != D.CardKind.OFFENSIVE:
+					continue
+				seen[used] = true
+				for t in card_targets(pid, used):
+					var data: Dictionary = t.duplicate()
+					data["use"] = used
+					result.append(data)
+		_:
+			if D.card(card_id)["kind"] == D.CardKind.OFFENSIVE:
+				for other in opponents(pid):
+					result.append({"player": other})
+			else:
+				result.append({})
 	return result
 
 
