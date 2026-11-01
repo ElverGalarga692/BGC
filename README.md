@@ -85,6 +85,9 @@ games/pests/             Pests! (en desarrollo: aún no aparece en el menú)
     pests_house.gd       La casa: colocación de losetas, vecinos, distancias,
                          invocación, reparto DLUR y salida/reentrada de la reina
     pests_house_generator.gd  Casas aleatorias (partida rápida, IA, tests)
+    pests_game.gd        La partida (GameBase): elección de exterminador,
+                         construcción de la casa, reina, acciones, trampas,
+                         victoria y eliminación (sin cartas todavía)
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 

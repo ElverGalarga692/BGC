@@ -34,7 +34,7 @@ Si la reina está atrapada, solo escapa si sale su color en el dado.
 
 [b]2. El exterminador.[/b] Tienes [b]1 movimiento gratis[/b] y luego [b]2 puntos de acción[/b]. Si empiezas con otra acción que no sea moverte, pierdes el movimiento gratis. Los puntos que no uses se pierden.
 • Moverse: 1 por habitación (solo por puertas).
-• Exterminar: 1 — tira el d6 y quita esas plagas de tu habitación.
+• Exterminar: 1 — tira el d6 y quita ese número de plagas de tu color de tu habitación. Vuelven a tu reserva.
 • Soltar trampa: 1 (no en tu nido).
 • Vaciar trampa: 1 — si tiene a tu reina, necesitas el nido sellado y ninguna plaga en la casa.
 • Arrastrar trampa: 2 — te mueves con una trampa a la habitación de al lado.
@@ -55,3 +55,12 @@ El reglamento original es una edición de prueba (v1.2) y deja algunas dudas. As
 • [b]Poblar a 2 habitaciones (rojo):[/b] si no hay habitaciones a esa distancia, se usan las vecinas; si tampoco hay, las plagas se quedan en la habitación de la reina.
 • [b]Volver a entrar en la casa:[/b] se cuenta casilla a casilla por fuera de la casa. Con empate gana la puerta que se alcanza antes girando alrededor de la casa en el sentido de las agujas del reloj y, si aún hay empate, la del orden DLUR. Los espectros (morado) pueden entrar por cualquier pared.
 • [b]Invocar sin camino:[/b] las plagas que no tienen forma de llegar hasta la reina se quedan donde están.
+• [b]Plagas exterminadas:[/b] vuelven a tu reserva (como las de una trampa vaciada), así que pueden volver a salir. Solo las cartas que lo dicen devuelven plagas a la caja. Por eso sellar el nido y atrapar a la reina es imprescindible.
+• [b]Para ganar[/b] no puede quedar ninguna plaga tuya en la casa; las que estén en otra trampa tuya no cuentan.
+• [b]Quién empieza:[/b] el jugador que sale en el dado elige exterminador el primero, coloca la primera loseta y juega el primer turno. Con el orden del reglamento siempre es el mismo jugador.
+• [b]Losetas imposibles:[/b] si un jugador no puede colocar ninguna de sus losetas normales, las devuelve a la caja. Si su nido no cabe en ningún sitio, se coloca adaptando sus puertas a las de alrededor.
+• [b]Infestación inicial:[/b] las 4 plagas van a las habitaciones conectadas por puertas, también para el morado. Al invocar y al poblar, las plagas moradas sí atraviesan paredes.
+• [b]Trampas:[/b] atrapan en cuanto algo de su color está en su habitación (al soltarla, al arrastrarla o cuando entra). Si en una trampa vacía coinciden la reina y plagas, se atrapa lo que eligió su dueño al soltarla (por defecto, la reina). La trampa amarilla atrae también las plagas de las habitaciones conectadas por puertas.
+• [b]Reina atrapada:[/b] aunque no actúe, su nido sigue generando plagas si no está sellado. Si una reina entra en una trampa a mitad de su movimiento, se detiene ahí.
+• [b]Patio interior:[/b] cuenta como no poder actuar: vuelve a su habitación y suelta 2 plagas.
+• [b]Jugador eliminado:[/b] sus plagas, su reina y sus trampas salen de la casa y su turno se salta. Si solo queda un jugador, gana.

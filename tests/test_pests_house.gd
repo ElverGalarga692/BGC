@@ -274,3 +274,20 @@ func test_reentry_clockwise_picks_right_side() -> void:
 	var r := h.place_custom(Vector2i(1, 0), D.DOOR_LEFT | D.DOOR_RIGHT)
 	assert_eq(h.queen_step(a, D.Dir.UP), {"result": PestsHouse.Step.REENTERED, "room": r})
 	assert_ne(l, r)
+
+
+func test_fitted_nest() -> void:
+	var h := PestsHouse.new()
+	# (1,-1) con la entrada sin tocar: no conecta con nada.
+	assert_eq(h.fitted_nest_doors(Vector2i(1, -1)), 0)
+	var x := h.place_custom(Vector2i(1, 0), D.DOOR_LEFT)  # pared arriba
+	h.place_custom(Vector2i(0, -1), D.DOOR_DOWN | D.DOOR_RIGHT)
+	# En (1,-1): abajo X (pared), izquierda (0,-1) con puerta: el nido normal no cabe.
+	assert_ne(h.can_place(Vector2i(1, -1), D.NEST_DOORS), "")
+	var doors := h.fitted_nest_doors(Vector2i(1, -1))
+	assert_eq(doors, D.DOOR_LEFT | D.DOOR_UP | D.DOOR_RIGHT)
+	var n := h.place_fitted_nest(Vector2i(1, -1), D.Species.BLUE)
+	assert_eq(h.nest_of(D.Species.BLUE), n)
+	assert_eq(h.neighbor(n, D.Dir.DOWN), -1, "no hay puerta hacia X")
+	assert_true(h.is_fully_connected())
+	assert_ne(x, n)

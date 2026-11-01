@@ -176,6 +176,32 @@ func place_nest(cell: Vector2i, species: int, rotation: int = 0) -> int:
 	return _add_room(cell, doors, D.RoomKind.NEST, species, -1, rotation)
 
 
+## Puertas que tendría un nido "adaptado" en `cell`: puerta hacia cada casilla
+## vacía y hacia cada habitación que tenga puerta hacia ella. Es el último
+## recurso cuando un nido no cabe en ningún sitio con las reglas normales.
+## Devuelve 0 si ni así se conectaría con la casa.
+func fitted_nest_doors(cell: Vector2i) -> int:
+	if room_at(cell) >= 0 or is_blocked(cell):
+		return 0
+	var doors := 0
+	var connected := false
+	for dir in 4:
+		var other := room_at(cell + D.DIR_VECTORS[dir])
+		if other < 0:
+			doors |= D.dir_bit(dir)
+		elif has_door(other, D.opposite(dir)):
+			doors |= D.dir_bit(dir)
+			connected = true
+	return doors if connected else 0
+
+
+## Coloca un nido con las puertas de fitted_nest_doors().
+func place_fitted_nest(cell: Vector2i, species: int) -> int:
+	var doors := fitted_nest_doors(cell)
+	assert(doors != 0, "El nido no se puede conectar ahí")
+	return _add_room(cell, doors, D.RoomKind.NEST, species, -1, 0)
+
+
 ## Coloca una habitación con puertas arbitrarias, sin validar (para tests y
 ## herramientas).
 func place_custom(cell: Vector2i, doors: int) -> int:
