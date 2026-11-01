@@ -12,6 +12,13 @@ var _pages: Control
 var _games_box: VBoxContainer
 var _setup_box: VBoxContainer
 var _settings_box: VBoxContainer
+var _lobby_box: VBoxContainer
+var _local_content: VBoxContainer
+var _net_content: VBoxContainer
+var _play_button: Button
+var _hosts_list: VBoxContainer
+var _net_name: LineEdit
+var _net_status: Label
 var _selected_game: Dictionary = {}
 var _player_count := 3
 var _count_buttons: Array[Button] = []
@@ -42,6 +49,7 @@ func _ready() -> void:
 	_games_box = _page()
 	_setup_box = _page()
 	_settings_box = _page()
+	_lobby_box = _page()
 	_build_game_list()
 	_build_settings()
 
@@ -51,6 +59,15 @@ func _ready() -> void:
 	column.add_child(footer)
 
 	_show_page(_games_box, false)
+	Net.lobby_changed.connect(_on_lobby_changed)
+	Net.hosts_changed.connect(_refresh_hosts)
+	Net.disconnected.connect(func(reason: String) -> void:
+		Net.stop_discovery()
+		_show_notice(reason)
+		_show_page(_games_box))
+	if App.menu_notice != "":
+		_show_notice(App.menu_notice)
+		App.menu_notice = ""
 	# Entrada: la columna aparece desde abajo.
 	column.modulate.a = 0.0
 	var intro := create_tween().set_parallel()
@@ -92,7 +109,7 @@ func _page() -> VBoxContainer:
 
 
 func _show_page(page: Control, animate: bool = true) -> void:
-	for p in [_games_box, _setup_box, _settings_box]:
+	for p in [_games_box, _setup_box, _settings_box, _lobby_box]:
 		p.visible = p == page
 	if animate:
 		page.modulate.a = 0.0
@@ -170,6 +187,18 @@ func _game_card(game: Dictionary) -> Button:
 
 # --- Página de juegos ------------------------------------------------------------------
 
+## Aviso arriba de la lista de juegos (p. ej. una desconexión).
+func _show_notice(text: String) -> void:
+	var old := _games_box.get_node_or_null("Notice")
+	if old != null:
+		old.queue_free()
+	var notice := _label("⚠  " + text, 15, BGCTheme.ACCENT)
+	notice.name = "Notice"
+	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_games_box.add_child(notice)
+	_games_box.move_child(notice, 0)
+
+
 func _build_game_list() -> void:
 	_games_box.add_child(_section("Elige un juego"))
 	for game in GameRegistry.all_games():
@@ -203,6 +232,27 @@ func _on_game_chosen(game: Dictionary) -> void:
 	title.add_theme_font_override("font", BGCTheme.bold_font(0.8))
 	_setup_box.add_child(title)
 
+	var modes := HBoxContainer.new()
+	modes.add_theme_constant_override("separation", 8)
+	var mode_group := ButtonGroup.new()
+	for entry in [["En este equipo", false], ["En red local", true]]:
+		var mb := _button(entry[0], _set_network_mode.bind(entry[1]), "", 42)
+		mb.toggle_mode = true
+		mb.button_group = mode_group
+		mb.button_pressed = not entry[1]
+		mb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		modes.add_child(mb)
+	_setup_box.add_child(modes)
+
+	_local_content = VBoxContainer.new()
+	_local_content.add_theme_constant_override("separation", 12)
+	_setup_box.add_child(_local_content)
+	_net_content = VBoxContainer.new()
+	_net_content.add_theme_constant_override("separation", 10)
+	_net_content.visible = false
+	_setup_box.add_child(_net_content)
+	_build_network_content()
+
 	var count_row := HBoxContainer.new()
 	count_row.add_theme_constant_override("separation", 8)
 	var count_label := _section("Jugadores")
@@ -219,26 +269,29 @@ func _on_game_chosen(game: Dictionary) -> void:
 		b.button_pressed = n == _player_count
 		count_row.add_child(b)
 		_count_buttons.append(b)
-	_setup_box.add_child(count_row)
+	_local_content.add_child(count_row)
 
 	_players_list = VBoxContainer.new()
 	_players_list.add_theme_constant_override("separation", 8)
-	_setup_box.add_child(_players_list)
+	_local_content.add_child(_players_list)
 	_name_edits.clear()
 	_color_pickers.clear()
 	_ai_options.clear()
 	_rebuild_player_rows()
 
-	_setup_box.add_child(_label("Todos jugáis en este equipo por turnos. Las IA juegan solas.", 13, BGCTheme.TEXT_DIM))
+	_local_content.add_child(_label("Todos jugáis en este equipo por turnos. Las IA juegan solas.", 13, BGCTheme.TEXT_DIM))
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 10)
-	var back := _button("Volver", func() -> void: _show_page(_games_box), "GhostButton", 50)
+	var back := _button("Volver", func() -> void:
+		Net.stop_discovery()
+		_show_page(_games_box), "GhostButton", 50)
 	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	buttons.add_child(back)
 	var play := _button("Jugar", _on_play, "PrimaryButton", 50)
 	play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	play.size_flags_stretch_ratio = 2.0
 	buttons.add_child(play)
+	_play_button = play
 	_setup_box.add_child(buttons)
 	_show_page(_setup_box)
 
@@ -299,6 +352,179 @@ func _on_play() -> void:
 			player_name = "IA %d" % (i + 1)
 		players.append(PlayerInfo.new(i, player_name, _color_pickers[i].color, level))
 	App.start_game(_selected_game["id"], players)
+
+
+# --- Red local ---------------------------------------------------------------------------
+
+func _set_network_mode(on: bool) -> void:
+	_local_content.visible = not on
+	_net_content.visible = on
+	_play_button.visible = not on
+	if on:
+		Net.start_discovery()
+		_refresh_hosts()
+	else:
+		Net.stop_discovery()
+
+
+func _build_network_content() -> void:
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	var name_label := _section("Tu nombre")
+	name_label.custom_minimum_size = Vector2(110, 0)
+	name_row.add_child(name_label)
+	_net_name = LineEdit.new()
+	_net_name.text = App.get_setting("net_name", "")
+	_net_name.placeholder_text = "Jugador"
+	_net_name.max_length = MAX_NAME_LENGTH
+	_net_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_row.add_child(_net_name)
+	_net_content.add_child(name_row)
+
+	_net_content.add_child(_button("Crear partida", _on_host, "PrimaryButton", 48))
+
+	_net_content.add_child(_section("O únete a una partida de la red"))
+	_hosts_list = VBoxContainer.new()
+	_hosts_list.add_theme_constant_override("separation", 6)
+	_net_content.add_child(_hosts_list)
+
+	var manual := HBoxContainer.new()
+	manual.add_theme_constant_override("separation", 8)
+	var ip := LineEdit.new()
+	ip.placeholder_text = "IP del anfitrión (p. ej. 192.168.1.20)"
+	ip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	manual.add_child(ip)
+	var join := _button("Unirse", func() -> void: _on_join(ip.text.strip_edges()), "", 40)
+	join.custom_minimum_size.x = 100
+	manual.add_child(join)
+	_net_content.add_child(manual)
+	_net_status = _label("", 14, BGCTheme.ACCENT)
+	_net_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_net_content.add_child(_net_status)
+	_net_content.add_child(_label("Todos los equipos deben estar en la misma red (wifi o cable).", 13, BGCTheme.TEXT_DIM))
+
+
+func _player_name() -> String:
+	var n := _net_name.text.strip_edges()
+	if n == "":
+		n = "Jugador"
+	App.set_setting("net_name", n)
+	return n
+
+
+func _refresh_hosts() -> void:
+	if _hosts_list == null:
+		return
+	for child in _hosts_list.get_children():
+		_hosts_list.remove_child(child)
+		child.queue_free()
+	if Net.hosts.is_empty():
+		_hosts_list.add_child(_label("Buscando partidas en la red…", 14, BGCTheme.TEXT_DIM))
+		return
+	for ip in Net.hosts:
+		var h: Dictionary = Net.hosts[ip]
+		var full: bool = h["players"] >= h["max"]
+		var b := _button("Unirse a la partida de %s   (%d/%d)   %s" % [h["name"], h["players"], h["max"], ip], _on_join.bind(ip), "", 42)
+		b.disabled = full
+		_hosts_list.add_child(b)
+
+
+func _on_host() -> void:
+	var error := Net.host_game(_player_name(), _selected_game["id"])
+	if error != "":
+		_net_status.text = error
+		return
+	Net.stop_discovery()
+	_show_page(_lobby_box)
+
+
+func _on_join(address: String) -> void:
+	if address == "":
+		_net_status.text = "Escribe la IP del anfitrión o elige una partida de la lista."
+		return
+	var error := Net.join_game(address, _player_name())
+	if error != "":
+		_net_status.text = error
+		return
+	_net_status.text = "Conectando con %s…" % address
+	Net.stop_discovery()
+
+
+## Sala de espera: quién está en la mesa; el anfitrión añade IAs y empieza.
+func _on_lobby_changed() -> void:
+	if not Net.active:
+		return
+	for child in _lobby_box.get_children():
+		_lobby_box.remove_child(child)
+		child.queue_free()
+	var title := _label("Sala de espera", 28)
+	title.add_theme_font_override("font", BGCTheme.bold_font(0.8))
+	_lobby_box.add_child(title)
+	if Net.is_host:
+		var ips := Net.local_addresses()
+		var where := ", ".join(ips) if not ips.is_empty() else "desconocida"
+		_lobby_box.add_child(_label("Los demás pueden encontrar la partida en la lista o unirse con tu IP: %s" % where, 14, BGCTheme.TEXT_DIM))
+	_lobby_box.add_child(_section("Jugadores (%d/%d)" % [Net.seats.size(), Net.MAX_PLAYERS]))
+	for i in Net.seats.size():
+		var seat: Dictionary = Net.seats[i]
+		var row_panel := PanelContainer.new()
+		row_panel.add_theme_stylebox_override("panel", BGCTheme.box(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.08), 12, 1, 0, 8))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		row_panel.add_child(row)
+		var swatch := ColorRect.new()
+		swatch.color = PlayerInfo.default_color(i)
+		swatch.custom_minimum_size = Vector2(22, 22)
+		swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(swatch)
+		var name_label := _label(seat["name"], 17)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(name_label)
+		var tags: Array[String] = []
+		if seat["peer"] == 1:
+			tags.append("Anfitrión")
+		if seat["peer"] == Net.my_id():
+			tags.append("Tú")
+		if seat["ai"] != PlayerInfo.AILevel.HUMAN:
+			tags.append(PlayerInfo.AI_LEVEL_NAMES[seat["ai"]])
+		row.add_child(_label(" · ".join(tags), 14, BGCTheme.ACCENT))
+		if Net.is_host and i > 0:
+			var remove := _button("Quitar", Net.remove_seat.bind(i), "GhostButton", 32)
+			row.add_child(remove)
+		_lobby_box.add_child(row_panel)
+	if Net.is_host and Net.seats.size() < Net.MAX_PLAYERS:
+		var add_row := HBoxContainer.new()
+		add_row.add_theme_constant_override("separation", 8)
+		var level := OptionButton.new()
+		for l in [PlayerInfo.AILevel.EASY, PlayerInfo.AILevel.NORMAL, PlayerInfo.AILevel.HARD]:
+			level.add_item(PlayerInfo.AI_LEVEL_NAMES[l], l)
+		level.select(1)
+		level.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		add_row.add_child(level)
+		var add := _button("Añadir IA", func() -> void: Net.add_ai(level.get_selected_id()), "", 40)
+		add_row.add_child(add)
+		_lobby_box.add_child(add_row)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 10)
+	var leave := _button("Salir", func() -> void:
+		Net.leave()
+		_show_page(_games_box), "GhostButton", 50)
+	leave.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	buttons.add_child(leave)
+	if Net.is_host:
+		var start := _button("Empezar partida", Net.start_game, "PrimaryButton", 50)
+		start.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		start.size_flags_stretch_ratio = 2.0
+		start.disabled = Net.seats.size() < 2
+		start.tooltip_text = "Hacen falta al menos 2 jugadores" if start.disabled else ""
+		buttons.add_child(start)
+	else:
+		var waiting := _label("Esperando a que el anfitrión empiece…", 15, BGCTheme.TEXT_DIM)
+		waiting.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		buttons.add_child(waiting)
+	_lobby_box.add_child(buttons)
+	if not _lobby_box.visible:
+		_show_page(_lobby_box)
 
 
 # --- Página de ajustes -----------------------------------------------------------------

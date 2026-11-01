@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 
 App="*res://core/app.gd"
 Sfx="*res://core/sfx.gd"
+Net="*res://core/net.gd"
 
 [display]
 

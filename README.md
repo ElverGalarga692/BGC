@@ -1,7 +1,14 @@
 # BGC: Board Game Collection
 
-Colección de juegos de mesa hecha en **Godot 4.3+ (GDScript)**, con
-**multijugador local** (hot-seat: varios jugadores en el mismo equipo).
+Colección de juegos de mesa hecha en **Godot 4.3+ (GDScript)**, con dos
+modos multijugador:
+
+- **En este equipo** (hot-seat): todos juegan en el mismo ordenador por
+  turnos.
+- **En red local**: cada jugador en su ordenador, conectados a la misma red
+  (wifi o cable).
+
+En los dos modos se pueden añadir jugadores controlados por la IA.
 
 El primer juego es **Archipiélago**: coloniza islas hexagonales, recoge
 recursos, comercia y construye.
@@ -40,6 +47,7 @@ los tests y el guardado de partidas reutilizan la misma lógica.
 core/                    Compartido por todos los juegos
   app.gd                 Autoload "App": navegación, sesión, ajustes y partidas guardadas
   sfx.gd                 Autoload "Sfx": efectos de sonido sintetizados
+  net.gd                 Autoload "Net": multijugador en red local
   game_base.gd           Clase base de la lógica de un juego
   game_registry.gd       Lista de juegos de la colección
   action.gd              GameAction: una jugada serializable
@@ -107,6 +115,32 @@ nombre. Convenciones que usa la vista 3D:
   juego (color del jugador y color del recurso del puerto).
 - La carpeta `art/` lleva un `.gdignore` para que Godot no intente importar
   el `.blend`.
+
+### Multijugador en red local
+
+1. Un jugador elige el juego, pulsa **En red local → Crear partida** y queda
+   en la sala de espera (ahí ve su IP).
+2. Los demás, en **En red local**, ven la partida en la lista y pulsan
+   **Unirse** (o escriben la IP del anfitrión).
+3. El anfitrión puede añadir IAs y pulsa **Empezar partida**.
+
+Funcionamiento (`core/net.gd`, autoload `Net`, con ENet de Godot):
+- El **anfitrión tiene la autoridad**: los clientes le envían sus acciones,
+  él las valida con las reglas y las reenvía a todos, que las aplican en su
+  copia. Como las partidas son deterministas, todos los equipos calculan los
+  mismos dados y robos.
+- Las IAs funcionan en el equipo del anfitrión.
+- Si un jugador se desconecta, una IA ocupa su plaza; si se desconecta el
+  anfitrión, los demás vuelven al menú.
+- El anfitrión se anuncia por difusión UDP (puerto 47811) y la partida usa
+  el puerto 47810. Si un cortafuegos los bloquea, hay que permitirlos.
+- Cada equipo solo muestra la mano de su jugador, pero tiene la partida
+  completa en memoria: está pensado para jugar entre amigos, no para
+  evitar trampas.
+- Para probar en un solo ordenador: abre dos ventanas del juego, crea la
+  partida en una y únete desde la otra con la IP `127.0.0.1`. Con la
+  variable de entorno `BGC_AUTOPLAY=1`, los jugadores humanos de esa
+  ventana juegan solos (útil para pruebas automáticas).
 
 ### Sonido
 

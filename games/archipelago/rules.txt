@@ -44,4 +44,5 @@ Solo puedes jugar una por turno, y nunca el turno en que la compras.
 [font_size=20][b]Controles[/b][/font_size]
 • Clic izquierdo: elegir casilla, esquina o lado.   • Clic derecho o Esc: cancelar.
 • Vista 3D: rueda para el zoom; botón central o Q / E para girar la cámara.
-• La partida se guarda sola después de cada jugada: puedes continuarla desde el menú.
+• La partida se guarda sola después de cada jugada: puedes continuarla desde el menú (en partidas en este equipo).
+• En red local, cada jugador usa su propio ordenador y solo ve su mano.

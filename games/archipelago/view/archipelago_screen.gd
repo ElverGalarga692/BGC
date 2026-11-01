@@ -64,8 +64,11 @@ var _ais := {}
 var _ai_pending := false
 var _ai_generation := 0
 ## Jugador cuya mano se muestra: el humano en turno, o el último humano que
-## jugó mientras juegan las IAs.
+## jugó mientras juegan las IAs. En red, siempre el jugador de este equipo.
 var _viewer := 0
+## Partida por red local: en este equipo solo se controla `_local_seat`.
+var _network := false
+var _local_seat := -1
 
 ## Ventana modal abierta (null si no hay) y su identificador.
 var _dialog: Control
@@ -83,6 +86,12 @@ func _ready() -> void:
 	_build_right_panel()
 	_build_overlays()
 	_set_view_3d(App.get_setting("board_3d", true), false)
+	Net.action_received.connect(_on_net_action)
+	Net.action_requested.connect(_on_net_request)
+	Net.action_rejected.connect(func(message: String) -> void:
+		_error_label.text = message
+		Sfx.play(&"error"))
+	Net.seat_replaced.connect(_on_seat_replaced)
 	resized.connect(_layout)
 	_start(App.session_seed())
 
@@ -91,6 +100,8 @@ func _start(seed: int) -> void:
 	_close_dialog()
 	game = ArchipelagoGame.new()
 	game.setup(App.session_players(), seed)
+	_network = App.session.get("network", false)
+	_local_seat = App.session.get("local_seat", -1)
 	_create_ais(seed)
 	# Partida guardada: se reconstruye repitiendo sus acciones (antes de
 	# conectar la interfaz, para no animar ni registrar todo otra vez).
@@ -111,6 +122,8 @@ func _start(seed: int) -> void:
 		_add_log("Partida guardada cargada (%d jugadas)." % game.history.size())
 		if load_error != "":
 			_add_log("[color=#ff8a80]No se pudo cargar del todo: %s[/color]" % load_error)
+	elif _network:
+		_add_log("Partida en red local. Juegas como %s." % game.players[_local_seat].display_name)
 	else:
 		_add_log("Partida nueva (semilla %d). Colocación inicial." % seed)
 	_refresh()
@@ -118,17 +131,39 @@ func _start(seed: int) -> void:
 	_show_banner("Turno de %s" % game.current_player().display_name, game.current_player().color)
 
 
+## Crea las IAs que maneja este equipo: todas en una partida local; en red,
+## solo el anfitrión. Con la variable de entorno BGC_AUTOPLAY=1, los
+## jugadores humanos de este equipo también juegan solos (para pruebas).
 func _create_ais(seed: int) -> void:
 	_ais.clear()
 	_viewer = -1
+	var autoplay := OS.get_environment("BGC_AUTOPLAY") == "1"
 	for p in game.players:
-		if p.is_ai:
-			var ai := ArchAI.new(p.id, p.ai_level, seed)
+		var runs_here := p.is_ai and (not _network or Net.is_host)
+		if runs_here or (autoplay and _is_local(p.id)):
+			var ai := ArchAI.new(p.id, p.ai_level if p.is_ai else PlayerInfo.AILevel.NORMAL, seed)
 			ai.observe(game)
 			_ais[p.id] = ai
-		elif _viewer == -1:
+		if _viewer == -1 and _is_local(p.id):
 			_viewer = p.id
 	_viewer = maxi(_viewer, 0)
+
+
+## true si el jugador lo maneja una persona sentada en este equipo.
+func _is_local(pid: int) -> bool:
+	if game.players[pid].is_ai:
+		return false
+	return pid == _local_seat if _network else true
+
+
+## Primer jugador que debe actuar ahora y es local (o -1).
+func _local_actor() -> int:
+	if game.finished:
+		return -1
+	for pid in game.players_to_act():
+		if _is_local(pid):
+			return pid
+	return -1
 
 
 # --- Construcción de la interfaz -------------------------------------------
@@ -311,7 +346,9 @@ func _build_overlays() -> void:
 	details.autowrap_mode = TextServer.AUTOWRAP_OFF
 	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(details)
-	box.add_child(_button("Nueva partida (mismos jugadores)", func() -> void: _start(BGCRng.random_seed())))
+	var again := _button("Nueva partida (mismos jugadores)", func() -> void: _start(BGCRng.random_seed()))
+	again.name = "Again"
+	box.add_child(again)
 	box.add_child(_button("Volver al menú", App.go_to_menu))
 
 
@@ -363,15 +400,15 @@ func _set_view_3d(enable: bool, save: bool = true) -> void:
 func _refresh() -> void:
 	var pid := game.turns.current
 	var player := game.players[pid]
-	var human_turn := not player.is_ai
+	var human_turn := _is_local(pid)
 	var main := game.phase == G.Phase.MAIN and game.trade_offer.is_empty() and human_turn
-	if human_turn or _ais.size() == game.players.size():
+	if not _network and (human_turn or _ais.size() == game.players.size()):
 		_viewer = pid
 	var viewer := game.players[_viewer]
 
 	_refresh_players()
 
-	_turn_label.text = player.display_name + (" (IA)" if player.is_ai else "")
+	_turn_label.text = player.display_name + (" (IA)" if player.is_ai else (" (tú)" if _network and pid == _local_seat else ""))
 	_turn_label.add_theme_color_override("font_color", player.color.lightened(0.2))
 	var hidden: int = game.dev_hands[_viewer][DevCard.MONUMENT]
 	_points_label.text = "%d PV" % game.victory_points(_viewer) + (" (%d ocultos)" % hidden if hidden > 0 else "")
@@ -392,7 +429,7 @@ func _refresh() -> void:
 
 	for mode in [Mode.ROAD, Mode.SETTLEMENT, Mode.CITY]:
 		var button: Button = _build_buttons[mode]
-		var error := game.build_error(pid, _mode_action(mode)) if human_turn else "Es el turno de la IA"
+		var error := game.build_error(pid, _mode_action(mode)) if human_turn else "No es tu turno"
 		button.disabled = error != ""
 		button.tooltip_text = error
 		button.set_pressed_no_signal(_mode == mode)
@@ -496,10 +533,11 @@ func _dev_probe_data(card: int) -> Dictionary:
 
 func _prompt_text() -> String:
 	var pid := game.turns.current
-	if not game.finished:
+	if not game.finished and _local_actor() == -1:
 		var actor: int = game.players_to_act()[0]
 		if game.players[actor].is_ai:
 			return "%s (IA) está pensando…" % game.players[actor].display_name
+		return "Esperando a %s…" % game.players[actor].display_name
 	if not game.trade_offer.is_empty():
 		return "Esperando respuesta a la oferta…"
 	match game.phase:
@@ -528,7 +566,7 @@ func _prompt_text() -> String:
 
 func _update_targets() -> void:
 	var pid := game.turns.current
-	if _dialog != null or not game.trade_offer.is_empty() or game.current_player().is_ai:
+	if _dialog != null or not game.trade_offer.is_empty() or not _is_local(game.turns.current):
 		_board_view.set_targets(Pick.NONE, [])
 		return
 	match game.phase:
@@ -634,13 +672,15 @@ func _cancel_dialog() -> void:
 ## Las ventanas que dependen del estado de la partida (descartes y ofertas)
 ## se abren y cierran solas.
 func _update_state_dialog() -> void:
-	var actor: int = game.players_to_act()[0] if not game.finished else -1
-	if actor >= 0 and game.players[actor].is_ai:
+	var actor := _local_actor()
+	var needs_dialog := actor >= 0 and (game.phase == G.Phase.DISCARD or not game.trade_offer.is_empty())
+	if not needs_dialog:
 		if _dialog_key.begins_with("state:"):
 			_close_dialog()
+			_update_targets()
 		return
 	if game.phase == G.Phase.DISCARD:
-		var pid: int = game.players_to_act()[0]
+		var pid := actor
 		if not _dialog_key.begins_with("state:discard:%d:" % pid):
 			_open_discard_dialog(pid, "state:discard:%d:%d" % [pid, game.history.size()])
 	elif not game.trade_offer.is_empty():
@@ -839,8 +879,7 @@ func _open_monopoly_dialog() -> void:
 func _schedule_ai() -> void:
 	if game.finished or _ai_pending or not is_inside_tree():
 		return
-	var actor: int = game.players_to_act()[0]
-	if not _ais.has(actor):
+	if _ai_actor() == -1:
 		return
 	_ai_pending = true
 	var delay := AI_DELAY_FAST if _ai_fast_toggle.button_pressed else AI_DELAY
@@ -855,16 +894,24 @@ func _run_ai(generation: int) -> void:
 	_ai_pending = false
 	if game.finished:
 		return
-	var actor: int = game.players_to_act()[0]
-	if not _ais.has(actor):
+	var actor := _ai_actor()
+	if actor == -1:
 		return
 	var action: GameAction = _ais[actor].choose_action(game)
 	if action == null:
 		push_warning("La IA de %s no encontró ninguna acción" % game.players[actor].display_name)
 		return
-	var error := game.submit(action)
+	var error := _send(action)
 	if error != "":
 		push_warning("Acción ilegal de la IA: %s (%s)" % [action, error])
+
+
+## Primer jugador que debe actuar y lo maneja una IA de este equipo (o -1).
+func _ai_actor() -> int:
+	for pid in game.players_to_act():
+		if _ais.has(pid):
+			return pid
+	return -1
 
 
 # --- Interfaz -> acciones -------------------------------------------------------
@@ -873,10 +920,55 @@ func _run_ai(generation: int) -> void:
 ## se rechaza.
 func _submit(type: StringName, data: Dictionary = {}, pid: int = -1) -> void:
 	var actor := game.turns.current if pid < 0 else pid
-	var error := game.submit(GameAction.new(type, actor, data))
+	var error := _send(GameAction.new(type, actor, data))
 	_error_label.text = error
 	if error != "":
 		Sfx.play(&"error")
+
+
+## Punto único por el que pasan todas las jugadas de este equipo. En local
+## (o en el anfitrión) se aplican directamente; un cliente se las pide al
+## anfitrión, que las valida y las reenvía a todos.
+func _send(action: GameAction) -> String:
+	if _network and not Net.is_host:
+		if not game.players[action.player_id].is_ai and action.player_id != _local_seat:
+			return "No puedes actuar por otro jugador"
+		var error := game.validate(action)  # aviso inmediato; el anfitrión decide
+		if error == "":
+			Net.request_action(action.to_dict())
+		return error
+	return game.submit(action)
+
+
+# --- Red local ---------------------------------------------------------------------
+
+## Anfitrión: un cliente pide una jugada.
+func _on_net_request(data: Dictionary, peer_id: int) -> void:
+	if not _network:
+		return
+	var error := game.submit(GameAction.from_dict(data))
+	if error != "":
+		Net.reject(peer_id, error)
+
+
+## Cliente: el anfitrión confirma una jugada; se aplica igual aquí.
+func _on_net_action(data: Dictionary) -> void:
+	if not _network or Net.is_host:
+		return
+	var error := game.submit(GameAction.from_dict(data))
+	if error != "":
+		_add_log("[color=#ff8a80]Desincronización con el anfitrión: %s[/color]" % error)
+
+
+## Un jugador se ha desconectado: pasa a jugar una IA (en el anfitrión).
+func _on_seat_replaced(seat: int) -> void:
+	if not _network or game == null:
+		return
+	game.players[seat].ai_level = PlayerInfo.AILevel.NORMAL
+	if Net.is_host:
+		_ais[seat] = ArchAI.new(seat, PlayerInfo.AILevel.NORMAL, game.rng.seed_value)
+	_add_log("[color=#ffd166]%s se ha desconectado: ahora juega una IA.[/color]" % game.players[seat].display_name)
+	_refresh()
 
 
 func _on_build_pressed(mode: Mode) -> void:
@@ -992,14 +1084,16 @@ func _on_action_applied(action: GameAction) -> void:
 		_add_log("Termina la colocación inicial. ¡Empieza la partida!")
 	_refresh()
 	_board_view.refresh()
-	if game.finished:
+	if _network:
+		Net.broadcast_action(action.to_dict())  # solo hace algo en el anfitrión
+	elif game.finished:
 		App.delete_save("archipelago")
 	else:
 		App.save_game("archipelago", game.save_data())
 	if game.turns.current != action.player_id and action.type in [G.END_TURN, G.BUILD_ROAD] and not game.finished:
 		var p := game.current_player()
 		_show_banner("Turno de %s" % p.display_name, p.color)
-		if not p.is_ai:
+		if _is_local(p.id):
 			Sfx.play(&"turn")
 
 
@@ -1057,6 +1151,7 @@ func _show_victory(winner_ids: Array[int]) -> void:
 		lines.append("%s: %d puntos" % [p.display_name, game.victory_points(p.id)])
 	var details: Label = _victory.find_child("Details", true, false)
 	details.text = "\n".join(lines)
+	_victory.find_child("Again", true, false).visible = not _network
 	_victory.visible = true
 	_refresh()
 	_layout()

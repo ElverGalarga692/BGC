@@ -8,6 +8,8 @@ const SETTINGS_PATH := "user://settings.cfg"
 ## Configuración de la partida en curso:
 ## {"game_id": String, "players": Array[PlayerInfo], "seed": int}
 var session: Dictionary = {}
+## Aviso pendiente de mostrar en el menú principal.
+var menu_notice := ""
 
 
 var _settings := ConfigFile.new()
@@ -85,9 +87,28 @@ func start_game(game_id: String, players: Array[PlayerInfo], seed: int = -1) -> 
 	get_tree().change_scene_to_file(game["scene"])
 
 
-func go_to_menu() -> void:
+## Vuelve al menú. Si se indica `notice`, el menú lo muestra (p. ej. "el
+## anfitrión ha cerrado la partida"). Sale de la partida en red si la hay.
+func go_to_menu(notice: String = "") -> void:
 	session = {}
+	menu_notice = notice
+	var net := get_node_or_null("/root/Net")
+	if net != null and net.active:
+		net.leave()
 	get_tree().change_scene_to_file(MAIN_MENU)
+
+
+## Partida en red: `local_seat` es la plaza del jugador de este equipo.
+func start_network_game(game_id: String, players: Array[PlayerInfo], seed: int, local_seat: int) -> void:
+	var game := GameRegistry.find(game_id)
+	session = {
+		"game_id": game_id,
+		"players": players,
+		"seed": seed,
+		"network": true,
+		"local_seat": local_seat,
+	}
+	get_tree().change_scene_to_file(game["scene"])
 
 
 ## Jugadores de la sesión, o unos por defecto si se abre la escena del juego
