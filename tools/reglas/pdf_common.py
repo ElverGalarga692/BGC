@@ -30,6 +30,10 @@ pdfmetrics.registerFontFamily("Sans", normal="Sans", bold="Sans-Bold", italic="S
 # Colores de la interfaz del juego (ui_common/bgc_theme.gd y las pantallas).
 NAVY = colors.HexColor("#163246")
 NAVY_DARK = colors.HexColor("#0f2433")
+# Color principal de cada reglamento (portada, cabeceras, títulos). Por
+# defecto, el azul de Archipiélago; cada juego lo cambia con set_theme().
+THEME = {"primary": NAVY, "dark": NAVY_DARK, "cover_text": colors.HexColor("#cfe0ec"),
+         "cover_note": colors.HexColor("#8fb0c6")}
 GOLD = colors.HexColor("#ffd166")
 INK = colors.HexColor("#1d2731")
 MUTED = colors.HexColor("#5b6773")
@@ -53,6 +57,13 @@ CELL_B = ParagraphStyle("cellb", parent=CELL, fontName="Sans-Bold")
 NOTE = ParagraphStyle("note", parent=BODY, fontSize=9.5, leading=13.5, spaceAfter=0)
 
 
+def set_theme(primary, dark, cover_text, cover_note, heading=None):
+    """Cambia el color principal del reglamento (llamar antes de maquetar)."""
+    THEME.update(primary=colors.HexColor(primary), dark=colors.HexColor(dark),
+                 cover_text=colors.HexColor(cover_text), cover_note=colors.HexColor(cover_note))
+    H1.textColor = H2.textColor = colors.HexColor(heading or primary)
+
+
 def p(text, style=BODY):
     return Paragraph(text, style)
 
@@ -73,7 +84,7 @@ def screenshot(path, caption=None, width=CONTENT_W, crop=None, keep=True):
     height = width * img.height / img.width
     framed = Table([[Image(buf, width=width, height=height)]], colWidths=[width])
     framed.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.8, NAVY_DARK),
+        ("BOX", (0, 0), (-1, -1), 0.8, THEME["dark"]),
         ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
@@ -116,7 +127,7 @@ def table(rows, col_widths, header=True, swatches=None):
         ("ROWBACKGROUNDS", (0, 1 if header else 0), (-1, -1), [colors.white, SOFT]),
     ]
     if header:
-        cmds.append(("BACKGROUND", (0, 0), (-1, 0), NAVY))
+        cmds.append(("BACKGROUND", (0, 0), (-1, 0), THEME["primary"]))
     for row, color in (swatches or {}).items():
         cmds.append(("BACKGROUND", (0, row), (0, row), colors.HexColor(color)))
     t.setStyle(TableStyle(cmds))
@@ -143,7 +154,7 @@ class RulesDoc(BaseDocTemplate):
 
     def _cover(self, canvas, doc):
         canvas.saveState()
-        canvas.setFillColor(NAVY)
+        canvas.setFillColor(THEME["primary"])
         canvas.rect(0, 0, PAGE_W, PAGE_H, stroke=0, fill=1)
         canvas.setFillColor(GOLD)
         canvas.setFont("Sans-Bold", 11)
@@ -152,7 +163,7 @@ class RulesDoc(BaseDocTemplate):
         canvas.setFont("Sans-Bold", 44)
         canvas.drawString(MARGIN, PAGE_H - 48 * mm, self.game_title)
         canvas.setFont("Sans", 15)
-        canvas.setFillColor(colors.HexColor("#cfe0ec"))
+        canvas.setFillColor(THEME["cover_text"])
         canvas.drawString(MARGIN, PAGE_H - 59 * mm, self.subtitle)
         canvas.setStrokeColor(GOLD)
         canvas.setLineWidth(2)
@@ -175,14 +186,14 @@ class RulesDoc(BaseDocTemplate):
         for line in self.tagline:
             canvas.drawString(MARGIN, ty, line)
             ty -= 6 * mm
-        canvas.setFillColor(colors.HexColor("#8fb0c6"))
+        canvas.setFillColor(THEME["cover_note"])
         canvas.setFont("Sans", 8.5)
         canvas.drawString(MARGIN, 14 * mm, "Reglamento con capturas de la versión digital.")
         canvas.restoreState()
 
     def _page(self, canvas, doc):
         canvas.saveState()
-        canvas.setFillColor(NAVY)
+        canvas.setFillColor(THEME["primary"])
         canvas.rect(0, PAGE_H - 12 * mm, PAGE_W, 12 * mm, stroke=0, fill=1)
         canvas.setFillColor(GOLD)
         canvas.rect(0, PAGE_H - 12.8 * mm, PAGE_W, 0.8 * mm, stroke=0, fill=1)

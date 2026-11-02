@@ -10,12 +10,19 @@ Los PDF están en `docs/reglas/`. Cada uno se genera en dos pasos:
    xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 res://tools/reglas/capture_archipelago.tscn -- /tmp/capturas
    ```
 
+   Hay una escena por juego (`capture_<juego>.tscn`); todas heredan de
+   `rules_capture.gd`, que juega la partida y abre la pantalla en cada
+   momento que se quiere fotografiar.
+
 2. **PDF**: un script de Python (ReportLab y Pillow, fuente DejaVu Sans)
    maqueta el texto y las capturas:
 
    ```bash
    python3 tools/reglas/build_archipelago.py /tmp/capturas docs/reglas/archipielago.pdf
    ```
+
+   Para Pests!: `capture_pests.tscn` y `build_pests.py` (salida
+   `docs/reglas/pests.pdf`).
 
 `pdf_common.py` tiene los estilos y piezas que comparten todos los
 reglamentos (portada, figuras, tablas, recuadros).

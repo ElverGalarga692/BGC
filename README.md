@@ -22,7 +22,7 @@ Juegos:
   contra la Hermandad de la Sombra y su Usurpador (5–10 jugadores).
 
 Reglamentos ilustrados en PDF (con capturas del juego) en `docs/reglas/`:
-[Archipiélago](docs/reglas/archipielago.pdf).
+[Archipiélago](docs/reglas/archipielago.pdf) y [Pests!](docs/reglas/pests.pdf).
 
 ## Cómo ejecutarlo
 
