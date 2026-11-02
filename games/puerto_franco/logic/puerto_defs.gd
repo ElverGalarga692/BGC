@@ -90,12 +90,12 @@ const OFFICE_NAMES := {
 }
 const OFFICE_TEXT := {
 	Office.HARBOR: "Coge gratis 1 carta del muelle. Después se renueva el muelle entero.",
-	Office.SMUGGLER: "Coge 1 carta al azar de la mano de otro jugador y dale 1 moneda a cambio.",
-	Office.COLLECTOR: "Cada jugador con más edificios que tú te paga 1 moneda.",
-	Office.PLANNER: "Tus edificios cuestan 1 menos este turno. Puedes trasladar uno de tus edificios.",
+	Office.SMUGGLER: "Coge 1 carta al azar de la mano de otro jugador.",
+	Office.COLLECTOR: "Cada jugador con más monedas que tú te paga 1 moneda.",
+	Office.PLANNER: "Tus edificios cuestan 2 menos este turno. Puedes trasladar uno de tus edificios.",
 	Office.BUILDER: "Puedes construir 2 edificios este turno.",
 	Office.PATRON: "Gana 1 moneda por cada grupo de vecinos del mismo gremio de tu barrio (máx. 4).",
-	Office.MAYOR: "Al empezar tu turno coges la vara (desempatas y eliges primero) y robas 1 carta.",
+	Office.MAYOR: "Al empezar tu turno coges la vara (desempatas y eliges primero), robas 1 carta y ganas 1 moneda.",
 }
 ## Cargos con habilidad que se usa con una acción (el resto es automática).
 const ACTIVE_OFFICES := [Office.HARBOR, Office.SMUGGLER, Office.COLLECTOR, Office.PLANNER, Office.PATRON]
@@ -151,6 +151,8 @@ const FIRST_TO_FINISH_POINTS := 3
 ## Máximo de monedas que se acumulan sobre un cargo vacante.
 const MAX_VACANT_COINS := 3
 const PATRON_MAX := 4
+const PLANNER_DISCOUNT := 2
+const MAYOR_COINS := 1
 
 
 static func building(card: int) -> Dictionary:
@@ -181,11 +183,20 @@ static func is_wonder(card: int) -> bool:
 	return guild_of(card) == Guild.WONDER
 
 
-## Mazo completo, sin barajar.
-static func deck() -> Array[int]:
+## Con tantos jugadores o más se añade una copia de cada edificio normal de
+## coste EXTRA_MAX_COST o menos (si no, el mazo se agota a mitad de partida).
+const EXTRA_COPIES_FROM := 5
+const EXTRA_MAX_COST := 3
+
+
+## Mazo completo para `player_count` jugadores, sin barajar.
+static func deck(player_count: int = 4) -> Array[int]:
 	var cards: Array[int] = []
 	for i in BUILDINGS.size():
-		for c in BUILDINGS[i]["copies"]:
+		var copies: int = BUILDINGS[i]["copies"]
+		if player_count >= EXTRA_COPIES_FROM and not is_wonder(i) and cost_of(i) <= EXTRA_MAX_COST:
+			copies += 1
+		for c in copies:
 			cards.append(i)
 	return cards
 

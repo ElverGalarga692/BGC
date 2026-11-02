@@ -2,7 +2,7 @@
 Cada jugador es una familia de mercaderes que levanta su barrio alrededor de la Lonja. Cada ronda, el consejo del puerto reparte sus cargos: elígelos en secreto, puja por ellos y construye edificios que se apoyen unos a otros. [b]Gana quien tenga más puntos cuando alguien complete su barrio.[/b]
 
 [font_size=20][b]Material[/b][/font_size]
-• [b]65 cartas de edificio[/b] de cuatro gremios (Comercio, Mar, Oficios y Artes), con costes del 1 al 5, y 9 [b]maravillas[/b] únicas.
+• [b]65 cartas de edificio[/b]: 56 de cuatro gremios (Comercio, Mar, Oficios y Artes), con costes del 1 al 5, y 9 [b]maravillas[/b] únicas. Con 5 o 6 jugadores se juega con 12 cartas más (una copia extra de cada edificio de gremio de coste 1, 2 o 3).
 • [b]7 cargos[/b] del consejo, numerados del 1 al 7.
 • [b]Monedas[/b] y la [b]vara[/b] de mando.
 • Un [b]barrio[/b] por jugador: un hexágono de 19 casillas con la Lonja en el centro.
@@ -28,12 +28,12 @@ Se juega en orden de cargo, del 1 al 7. En tu turno:
 
 [font_size=20][b]Los cargos[/b][/font_size]
 1. [b]Capitana de puerto:[/b] coge gratis 1 carta del muelle. Después se descarta el resto y se saca un muelle nuevo.
-2. [b]Contrabandista:[/b] coge 1 carta al azar de la mano de otro jugador y dale 1 moneda a cambio (si tienes).
-3. [b]Recaudadora:[/b] cada jugador con más edificios que tú te paga 1 moneda (si tiene).
-4. [b]Urbanista:[/b] tus edificios cuestan 1 menos este turno. Además puedes trasladar uno de tus edificios a otra casilla libre, siempre que todo el barrio siga unido a la Lonja.
+2. [b]Contrabandista:[/b] coge 1 carta al azar de la mano de otro jugador.
+3. [b]Recaudadora:[/b] cada jugador con más monedas que tú te paga 1 moneda. (Te conviene usarla antes de cobrar.)
+4. [b]Urbanista:[/b] tus edificios cuestan 2 menos este turno (nunca menos de 0). Además puedes trasladar uno de tus edificios a otra casilla libre, siempre que todo el barrio siga unido a la Lonja.
 5. [b]Maestra de obras:[/b] puedes construir 2 edificios este turno.
 6. [b]Mecenas:[/b] gana 1 moneda por cada grupo de vecinos del mismo gremio que haya en tu barrio (máximo 4).
-7. [b]Alcaldesa:[/b] al empezar tu turno coges la vara y robas 1 carta.
+7. [b]Alcaldesa:[/b] al empezar tu turno coges la vara, robas 1 carta y ganas 1 moneda.
 
 [font_size=20][b]Las maravillas[/b][/font_size]
 • [b]Gran Mercado, Arsenal, Casa de los Gremios y Museo:[/b] +1 punto por cada edificio de Comercio, Mar, Oficios o Artes (respectivamente) de tu barrio.

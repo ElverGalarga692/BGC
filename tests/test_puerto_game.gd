@@ -70,6 +70,7 @@ func _autoplay(g: PuertoGame, max_actions: int = 20000) -> int:
 
 func test_deck_and_cells() -> void:
 	assert_eq(D.deck().size(), 65)
+	assert_eq(D.deck(5).size(), 77, "con 5 o más, una copia más de los de coste 1 a 3")
 	assert_eq(D.CELLS.size(), 19)
 	for i in D.CELLS.size():
 		assert_eq(HexCoords.distance(D.CELLS[i], Vector2i.ZERO) <= D.DISTRICT_RADIUS, true)
@@ -164,7 +165,7 @@ func test_setup() -> void:
 		assert_eq(g.hands[pid].size(), D.START_HAND)
 		assert_eq(g.building_count(pid), 0)
 		total += g.hands[pid].size()
-	assert_eq(total, D.deck().size())
+	assert_eq(total, D.deck(4).size())
 	assert_eq(g.players_to_act().size(), 4, "todos eligen a la vez")
 
 
@@ -289,10 +290,11 @@ func test_builder_builds_two() -> void:
 func test_planner_discount_and_move() -> void:
 	var g := _game(2)
 	_to_turn(g, D.Office.PLANNER, D.Office.MAYOR)
-	g.hands[0] = [1] as Array[int]  # Taberna (2)
+	g.hands[0] = [2] as Array[int]  # Tienda de especias (3)
 	g.districts[0][1] = 0
 	assert_eq(_do(g, G.INCOME, {"kind": G.Income.COINS}), "")
-	assert_eq(g.build_cost(0, 1), 1)
+	assert_eq(g.build_cost(0, 2), 1, "cuesta 2 menos")
+	assert_eq(g.build_cost(0, 0), 0, "nunca menos de 0")
 	assert_ne(_do(g, G.ABILITY, {"from": 1, "to": 9}), "", "quedaría suelto")
 	assert_eq(_do(g, G.ABILITY, {"from": 1, "to": 4}), "")
 	assert_eq(g.districts[0][4], 0)
@@ -313,7 +315,7 @@ func test_harbor_takes_and_refreshes_dock() -> void:
 	assert_ne(_do(g, G.ABILITY, {"index": 0}), "", "una vez por turno")
 
 
-func test_smuggler_takes_a_card_and_pays() -> void:
+func test_smuggler_takes_a_card() -> void:
 	var g := _game(3)
 	_pick_all(g, {0: [D.Office.SMUGGLER, 0], 1: [0, 0], 2: [6, 0]})
 	_do(g, G.INCOME, {"kind": G.Income.COINS})
@@ -323,28 +325,27 @@ func test_smuggler_takes_a_card_and_pays() -> void:
 	assert_eq(_do(g, G.ABILITY, {"target": 2}), "")
 	assert_eq(g.hands[0].size(), D.START_HAND + 1)
 	assert_eq(g.hands[2].size(), D.START_HAND - 1)
-	assert_eq(g.coins[0], D.START_COINS - 1)
-	assert_eq(g.coins[2], D.START_COINS + 1)
+	assert_eq(g.coins[0], D.START_COINS, "no paga nada")
+	assert_eq(g.coins[2], D.START_COINS)
 
 
 func test_collector_and_patron() -> void:
 	var g := _game(3)
-	g.districts[1][1] = 0
-	g.districts[2][1] = 5
 	g.districts[0][1] = 0
 	g.districts[0][7] = 1  # grupo de Comercio
 	g.districts[0][2] = 5
 	g.districts[0][3] = 6  # grupo de Mar (2 y 3 son vecinos)
+	g.coins.assign([5, 2, 2])
 	_pick_all(g, {0: [D.Office.PATRON, 0], 1: [D.Office.COLLECTOR, 0], 2: [6, 0]})
 	assert_eq(g.turns.current, 1)
-	_do(g, G.INCOME, {"kind": G.Income.COINS})
+	# Usa el cargo antes de cobrar: paga quien tiene más monedas que ella.
 	assert_eq(_do(g, G.ABILITY), "")
-	assert_eq(g.coins[1], D.START_COINS + D.COIN_INCOME + 1, "solo paga el 0, que tiene más edificios")
-	assert_eq(g.coins[0], D.START_COINS - 1)
+	assert_eq(g.coins, [4, 3, 2] as Array[int], "solo paga el 0 (el 2 tiene las mismas)")
+	_do(g, G.INCOME, {"kind": G.Income.COINS})
 	_do(g, G.END_TURN)
 	_do(g, G.INCOME, {"kind": G.Income.COINS})
 	assert_eq(_do(g, G.ABILITY), "")
-	assert_eq(g.coins[0], D.START_COINS - 1 + D.COIN_INCOME + 2)
+	assert_eq(g.coins[0], 4 + D.COIN_INCOME + 2, "2 grupos")
 
 
 func test_mayor_takes_the_vara_and_draws() -> void:
@@ -356,6 +357,7 @@ func test_mayor_takes_the_vara_and_draws() -> void:
 	_do(g, G.END_TURN)
 	assert_eq(g.vara, 1)
 	assert_eq(g.hands[1].size(), hand + 1)
+	assert_eq(g.coins[1], D.START_COINS + D.MAYOR_COINS)
 	assert_ne(_do(g, G.ABILITY), "", "la Alcaldesa no tiene acción")
 
 
@@ -402,7 +404,7 @@ func test_full_games_finish_and_replay() -> void:
 		var total := g.deck.size() + g.discard.size() + g.dock.size()
 		for pid in n:
 			total += g.hands[pid].size() + g.building_count(pid)
-		assert_eq(total, D.deck().size(), "%d jugadores: no se pierden cartas" % n)
+		assert_eq(total, D.deck(n).size(), "%d jugadores: no se pierden cartas" % n)
 		var copy := PuertoGame.new()
 		copy.setup(GameBase.players_from_save(g.save_data()), g.rng.seed_value)
 		assert_eq(copy.replay(g.save_data()["history"]), "")

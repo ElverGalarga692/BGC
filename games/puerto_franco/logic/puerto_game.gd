@@ -81,7 +81,7 @@ var final_scores: Array[Dictionary] = []
 func _on_setup() -> void:
 	var n := players.size()
 	assert(n >= 2 and n <= 6, "Puerto Franco es para 2–6 jugadores")
-	deck = D.deck()
+	deck = D.deck(n)
 	rng.shuffle(deck)
 	discard.clear()
 	coins.clear()
@@ -164,7 +164,7 @@ func vacant_offices() -> Array[int]:
 func build_cost(pid: int, card: int) -> int:
 	var cost := D.cost_of(card)
 	if phase == Phase.TURN and office_of[pid] == Office.PLANNER and holder[turn_office] == pid:
-		cost = maxi(0, cost - 1)
+		cost = maxi(0, cost - D.PLANNER_DISCOUNT)
 	return cost
 
 
@@ -546,7 +546,8 @@ func _next_turn() -> void:
 		var card := _draw()
 		if card >= 0:
 			hands[pid].append(card)
-		event.emit(&"mayor", {"player": pid, "drew": card >= 0})
+		coins[pid] += D.MAYOR_COINS
+		event.emit(&"mayor", {"player": pid, "drew": card >= 0, "coins": D.MAYOR_COINS})
 
 
 func _income(pid: int, data: Dictionary) -> void:
@@ -591,17 +592,12 @@ func _ability(pid: int, data: Dictionary) -> void:
 			var card: int = hands[target][index]
 			hands[target].remove_at(index)
 			hands[pid].append(card)
-			var paid := 0
-			if coins[pid] > 0:
-				coins[pid] -= 1
-				coins[target] += 1
-				paid = 1
-			event.emit(&"smuggled", {"player": pid, "target": target, "paid": paid})
+			event.emit(&"smuggled", {"player": pid, "target": target})
 		Office.COLLECTOR:
-			var mine := building_count(pid)
+			var mine := coins[pid]
 			var payers: Array[int] = []
 			for other in players.size():
-				if other != pid and building_count(other) > mine and coins[other] > 0:
+				if other != pid and coins[other] > mine:
 					coins[other] -= 1
 					coins[pid] += 1
 					payers.append(other)

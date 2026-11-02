@@ -140,6 +140,7 @@ games/puerto_franco/     Puerto Franco (en desarrollo, aún no está en el menú
                          cargos, objetivos, barrio hexagonal y puntuación
     puerto_game.gd       La partida (GameBase): elección secreta de cargos con
                          puja, vacantes, turnos, habilidades, construir y final
+    puerto_ai.gd         IA (fácil, normal y difícil); solo usa view_for
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -346,8 +347,30 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       guardado. Primera simulación con una estrategia sencilla: ~9–10
       rondas por partida; con 6 jugadores puntúan menos (faltan cartas), a
       revisar al equilibrar con la IA.
-- [ ] **Puerto Franco, fase 2:** IA (fácil, normal y difícil) y equilibrio
-      con simulaciones (pujas, cargos, número de cartas por jugadores).
+- [x] **Puerto Franco, fase 2: IA y equilibrio.** Tres niveles que solo
+      usan `view_for`. Fácil: elige cargo con mucho ruido, no puja ni mira
+      objetivos. Normal: valora cada cargo y cada forma de cobrar según lo que
+      podrá construir después, persigue los objetivos públicos y puja 1 si un
+      cargo le interesa mucho más que el resto. Difícil: predice qué cargo y
+      qué puja querrá cada rival con lo público (acierta ~2 de cada 3) y elige
+      el par cargo-puja con más valor esperado, sabiendo que si pierde se
+      queda un vacante; en la última ronda lo gasta todo, quiere a la Maestra
+      de obras si alguien puede cerrar la partida, pesa más los objetivos y
+      deja sitio para que crezcan los grupos. Las simulaciones cambiaron las
+      reglas: la Recaudadora cobraba a quien tenía más edificios y ganaba el
+      40 % de las veces que se elegía (premiaba construir poco y caro, que ya
+      era lo mejor); ahora cobra a quien tiene más monedas. La Urbanista
+      rebaja 2 (con 1 ganaba el 18 %), la Contrabandista no paga la moneda y
+      la Alcaldesa gana además 1 moneda. Ahora cada cargo gana entre el 21 y
+      el 32 % de las veces que se elige (a 4 jugadores, 25 % sería lo justo).
+      Con 5 o 6 jugadores el mazo se agotaba en la ronda 6 y el ganador hacía
+      ~28 puntos: se añaden 12 cartas (copias de coste 1 a 3) y ahora hace
+      ~41. Las partidas duran ~8 rondas con cualquier número de jugadores.
+      La normal gana el 42 % contra tres fáciles. Pendiente: la difícil solo
+      saca una ventaja pequeña a la normal (27 % en 400 partidas contra tres
+      normales; lo justo es 25 %). Lo que más pesa es cuánto vale una
+      moneda frente a construir (con 0,5 la IA ganaba el 11 %; con 1,1, lo
+      mejor), y ese ajuste ya lo tienen las dos.
 - [ ] **Puerto Franco, fase 3:** pantalla 2D (mesa de cargos, mano, barrio
       y barrios rivales), cortina de «Pasa el dispositivo» para la elección
       secreta y entrada en el menú.
