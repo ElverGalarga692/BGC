@@ -21,6 +21,9 @@ Juegos:
 - **La Conjura**: roles ocultos y deducción social; la Guardia Real
   contra la Hermandad de la Sombra y su Usurpador (5–10 jugadores).
 
+Reglamentos ilustrados en PDF (con capturas del juego) en `docs/reglas/`:
+[Archipiélago](docs/reglas/archipielago.pdf).
+
 ## Cómo ejecutarlo
 
 1. Abre la carpeta del proyecto con Godot 4.3 o superior.
