@@ -420,6 +420,22 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       sale una cifra flotante junto a su nombre. Sonidos nuevos (monedas,
       martillo y revelación). La pantalla final enseña el barrio de cada
       jugador. Con la IA rápida los rótulos ya no se acumulan.
+- [x] **Puerto Franco: equilibrio de la Urbanista.** Era la primera
+      elección del 23 % de las veces (repartido sería el 14 %) y perdía la
+      puja en la mitad de los casos, aunque solo ganaba el 24,5 % de las
+      veces que se ocupaba (lo justo a 4 jugadores es el 25 %): no era fuerte,
+      sino que su rebaja servía siempre, con cualquier mano, y todas las IAs
+      la querían a la vez. Las pruebas (quitar el traslado, rebaja de 1,
+      rebaja solo a partir de coste 3) mostraron que lo que atraía era la
+      rebaja. Ahora rebaja 2 solo a los edificios de coste 4 o más: vale la
+      pena cuando tienes uno caro en la mano. Además, la IA ya no suma un
+      valor fijo a la Urbanista ni a la vara de la Alcaldesa (hacía que
+      todas fueran al mismo cargo) y elige con algo más de variedad. Ahora
+      la Urbanista es la primera elección el 15,5 % de las veces y gana el
+      27,6 %; ningún cargo pasa del 21 % y hay menos choques. La normal sigue
+      ganando el 41 % contra tres fáciles; la difícil, el 23 % contra tres
+      normales en 300 partidas (antes 27 %, dentro del ruido; las normales
+      ahora son menos previsibles).
 
 ### Opciones de cada juego
 

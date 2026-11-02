@@ -44,12 +44,15 @@ const OBJECTIVE_WEIGHT := {AILevel.EASY: 0.0, AILevel.NORMAL: 0.5, AILevel.HARD:
 ## Ruido al elegir cargo y probabilidad de jugada al azar (fácil).
 const EASY_OFFICE_NOISE := 2.5
 const EASY_MISTAKE_CHANCE := 0.1
-const NORMAL_OFFICE_NOISE := 0.4
+## (más ruido = menos IAs amontonadas en el mismo cargo)
+const NORMAL_OFFICE_NOISE := 0.7
 ## Normal: margen sobre el segundo cargo para pujar 1.
 const BID_MARGIN := 1.5
 ## Al colocar, extra por cada casilla libre alrededor (sitio para crecer el
 ## grupo). La difícil lo tiene más en cuenta.
 const ROOM_WEIGHT := {AILevel.EASY: 0.03, AILevel.NORMAL: 0.03, AILevel.HARD: 0.12}
+## Difícil: lo que se supone que ahorra un rival con la Urbanista.
+const RIVAL_PLANNER_SAVING := 1.4
 ## Difícil: puja máxima que se plantea.
 const HARD_MAX_BID := 3
 
@@ -227,11 +230,11 @@ func card_keep_value(card: int, hand_size: int, p: int = -1) -> float:
 
 ## Mejor construcción posible con esta mano y estas monedas:
 ## {"index", "cell", "value"} (value = puntos − monedas gastadas).
-func best_build(hand: Array, coins: int, discount: int = 0) -> Dictionary:
+func best_build(hand: Array, coins: int, planner: bool = false) -> Dictionary:
 	var best := {"index": -1, "cell": -1, "value": 0.0}
 	var cv := coin_value()
 	for i in hand.size():
-		var cost := maxi(0, D.cost_of(hand[i]) - discount)
+		var cost := _cost(hand[i], planner)
 		if cost > coins:
 			continue
 		var place := placement(hand[i])
@@ -243,18 +246,22 @@ func best_build(hand: Array, coins: int, discount: int = 0) -> Dictionary:
 	return best
 
 
+func _cost(card: int, planner: bool) -> int:
+	return D.planner_cost(card) if planner else D.cost_of(card)
+
+
 ## Valor de una situación tras cobrar: lo mejor que se puede construir y lo
 ## que vale lo que sobra.
-func _plan_value(hand: Array, coins: int, extra_cards: float, builds: int, discount: int) -> float:
+func _plan_value(hand: Array, coins: int, extra_cards: float, builds: int, planner: bool) -> float:
 	var total := 0.0
 	var h := hand.duplicate()
 	var c := coins
 	for i in builds:
-		var b := best_build(h, c, discount)
+		var b := best_build(h, c, planner)
 		if b["index"] < 0:
 			break
 		total += b["value"]
-		c -= maxi(0, D.cost_of(h[b["index"]]) - discount)
+		c -= _cost(h[b["index"]], planner)
 		h.remove_at(b["index"])
 	total += c * coin_value()
 	for card in h:
@@ -292,15 +299,15 @@ func office_value(o: int, p: int) -> float:
 				if other != p and _coins(other) > coins:
 					v += cv + 0.3
 		Office.PLANNER:
-			v += 0.5
 			if mine:
-				var b := best_build(hand, coins + D.COIN_INCOME, D.PLANNER_DISCOUNT)
+				var b := best_build(hand, coins + D.COIN_INCOME, true)
 				if b["index"] >= 0:
-					v += cv * mini(D.PLANNER_DISCOUNT, D.cost_of(hand[b["index"]]))
+					var card: int = hand[b["index"]]
+					v += cv * (D.cost_of(card) - D.planner_cost(card))
 				v += maxf(0.0, _best_move(p)["gain"])
 			else:
-				# Un rival: casi siempre construirá con la rebaja.
-				v += cv * D.PLANNER_DISCOUNT if coins + D.COIN_INCOME >= 2 else 0.0
+				# Un rival: se estima con lo que suele ahorrar (no se ve su mano).
+				v += cv * RIVAL_PLANNER_SAVING if coins + D.COIN_INCOME >= 2 else 0.0
 				v += maxf(0.0, _best_move(p)["gain"])
 		Office.BUILDER:
 			if mine:
@@ -314,7 +321,7 @@ func office_value(o: int, p: int) -> float:
 		Office.PATRON:
 			v += mini(D.group_count(_district(p)), D.PATRON_MAX) * cv
 		Office.MAYOR:
-			v += BLIND_CARD_VALUE + 0.4 + D.MAYOR_COINS * cv
+			v += BLIND_CARD_VALUE + D.MAYOR_COINS * cv
 	return v
 
 
@@ -451,8 +458,7 @@ func _turn(legal: Array[GameAction]) -> GameAction:
 			return GameAction.new(G.ABILITY, pid, {"from": move["from"], "to": move["to"]})
 	# 4. Construir lo mejor que se pueda.
 	if _view["builds_left"] > 0:
-		var discount := D.PLANNER_DISCOUNT if office == Office.PLANNER else 0
-		var b := best_build(hand, coins, discount)
+		var b := best_build(hand, coins, office == Office.PLANNER)
 		if b["index"] >= 0 and b["value"] > -0.2:
 			return GameAction.new(G.BUILD, pid, {"card": b["index"], "cell": b["cell"]})
 	return GameAction.new(G.END_TURN, pid, {})
@@ -460,7 +466,7 @@ func _turn(legal: Array[GameAction]) -> GameAction:
 
 func _income(hand: Array, coins: int, office: int) -> GameAction:
 	var builds: int = _view["builds_left"]
-	var discount := D.PLANNER_DISCOUNT if office == Office.PLANNER else 0
+	var discount := office == Office.PLANNER
 	var customs := false
 	var shipyard := false
 	for c in _district(pid):

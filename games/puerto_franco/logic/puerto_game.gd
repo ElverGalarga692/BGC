@@ -162,10 +162,9 @@ func vacant_offices() -> Array[int]:
 ## Coste de construir `card` para el jugador del turno (con la rebaja de la
 ## Urbanista).
 func build_cost(pid: int, card: int) -> int:
-	var cost := D.cost_of(card)
 	if phase == Phase.TURN and office_of[pid] == Office.PLANNER and holder[turn_office] == pid:
-		cost = maxi(0, cost - D.PLANNER_DISCOUNT)
-	return cost
+		return D.planner_cost(card)
+	return D.cost_of(card)
 
 
 ## Casillas libres donde `pid` puede construir (vecinas de algo construido).

@@ -169,15 +169,16 @@ func test_hard_spends_everything_in_the_final_round() -> void:
 
 func test_hard_avoids_a_contest_it_would_lose() -> void:
 	# Los dos tienen un barrio que da 3 monedas con el Mecenas, pero el
-	# jugador 1 tiene la vara y dinero para pujar: la difícil no se pelea
-	# por él si lo va a perder.
+	# jugador 1 tiene la vara: la difícil no se pelea por él si lo va a
+	# perder.
 	var g := _game([AILevel.HARD, AILevel.NORMAL], 3)
 	for d in [g.districts[0], g.districts[1]]:
 		for pair in [[1, 7, 0], [3, 11, 5], [5, 15, 10]]:
 			d[pair[0]] = pair[2]
 			d[pair[1]] = pair[2]
 	g.vara = 1
-	g.coins.assign([1, 9])
+	# Sin monedas no puede superar ni una puja de 0 (el empate es del 1).
+	g.coins.assign([0, 9])
 	var ai := PuertoAI.new(0, AILevel.HARD)
 	ai._view = g.view_for(0)
 	var guess := ai.predict_pick(1)

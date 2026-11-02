@@ -30,7 +30,7 @@ Se juega en orden de cargo, del 1 al 7. En tu turno:
 1. [b]Capitana de puerto:[/b] coge gratis 1 carta del muelle. Después se descarta el resto y se saca un muelle nuevo.
 2. [b]Contrabandista:[/b] coge 1 carta al azar de la mano de otro jugador.
 3. [b]Recaudadora:[/b] cada jugador con más monedas que tú te paga 1 moneda. (Te conviene usarla antes de cobrar.)
-4. [b]Urbanista:[/b] tus edificios cuestan 2 menos este turno (nunca menos de 0). Además puedes trasladar uno de tus edificios a otra casilla libre, siempre que todo el barrio siga unido a la Lonja.
+4. [b]Urbanista:[/b] tus edificios de coste 4 o más cuestan 2 menos este turno. Además puedes trasladar uno de tus edificios a otra casilla libre, siempre que todo el barrio siga unido a la Lonja.
 5. [b]Maestra de obras:[/b] puedes construir 2 edificios este turno.
 6. [b]Mecenas:[/b] gana 1 moneda por cada grupo de vecinos del mismo gremio que haya en tu barrio (máximo 4).
 7. [b]Alcaldesa:[/b] al empezar tu turno coges la vara, robas 1 carta y ganas 1 moneda.

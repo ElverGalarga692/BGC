@@ -290,17 +290,18 @@ func test_builder_builds_two() -> void:
 func test_planner_discount_and_move() -> void:
 	var g := _game(2)
 	_to_turn(g, D.Office.PLANNER, D.Office.MAYOR)
-	g.hands[0] = [2] as Array[int]  # Tienda de especias (3)
+	g.hands[0] = [3] as Array[int]  # Casa de cambio (4)
 	g.districts[0][1] = 0
 	assert_eq(_do(g, G.INCOME, {"kind": G.Income.COINS}), "")
-	assert_eq(g.build_cost(0, 2), 1, "cuesta 2 menos")
-	assert_eq(g.build_cost(0, 0), 0, "nunca menos de 0")
+	assert_eq(g.build_cost(0, 3), 2, "coste 4: cuesta 2 menos")
+	assert_eq(g.build_cost(0, 2), 3, "coste 3: sin rebaja")
+	assert_eq(g.build_cost(0, 0), 1, "coste 1: sin rebaja")
 	assert_ne(_do(g, G.ABILITY, {"from": 1, "to": 9}), "", "quedaría suelto")
 	assert_eq(_do(g, G.ABILITY, {"from": 1, "to": 4}), "")
 	assert_eq(g.districts[0][4], 0)
 	assert_eq(g.districts[0][1], D.EMPTY)
 	assert_eq(_do(g, G.BUILD, {"card": 0, "cell": 3}), "")
-	assert_eq(g.coins[0], D.START_COINS + D.COIN_INCOME - 1)
+	assert_eq(g.coins[0], D.START_COINS + D.COIN_INCOME - 2)
 
 
 func test_harbor_takes_and_refreshes_dock() -> void:

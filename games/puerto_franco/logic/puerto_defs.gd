@@ -92,7 +92,7 @@ const OFFICE_TEXT := {
 	Office.HARBOR: "Coge gratis 1 carta del muelle. Después se renueva el muelle entero.",
 	Office.SMUGGLER: "Coge 1 carta al azar de la mano de otro jugador.",
 	Office.COLLECTOR: "Cada jugador con más monedas que tú te paga 1 moneda.",
-	Office.PLANNER: "Tus edificios cuestan 2 menos este turno. Puedes trasladar uno de tus edificios.",
+	Office.PLANNER: "Tus edificios de coste 4 o más cuestan 2 menos este turno. Puedes trasladar uno de tus edificios.",
 	Office.BUILDER: "Puedes construir 2 edificios este turno.",
 	Office.PATRON: "Gana 1 moneda por cada grupo de vecinos del mismo gremio de tu barrio (máx. 4).",
 	Office.MAYOR: "Al empezar tu turno coges la vara (desempatas y eliges primero), robas 1 carta y ganas 1 moneda.",
@@ -152,6 +152,9 @@ const FIRST_TO_FINISH_POINTS := 3
 const MAX_VACANT_COINS := 3
 const PATRON_MAX := 4
 const PLANNER_DISCOUNT := 2
+## La rebaja de la Urbanista solo vale para edificios de este coste o más
+## (si valiera para todos, servía siempre y todos la querían).
+const PLANNER_MIN_COST := 4
 const MAYOR_COINS := 1
 
 
@@ -354,3 +357,11 @@ static func score_district(district: Array, coins: int) -> Dictionary:
 		"wonders": wonder_points,
 		"total": buildings + group_points + wonder_points,
 	}
+
+
+## Coste de `card` con la rebaja de la Urbanista.
+static func planner_cost(card: int) -> int:
+	var cost := cost_of(card)
+	if cost < PLANNER_MIN_COST:
+		return cost
+	return maxi(0, cost - PLANNER_DISCOUNT)
