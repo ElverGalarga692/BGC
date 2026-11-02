@@ -84,6 +84,11 @@ var _overlay_seat := -1
 var _overlay_kind := ""
 var _overlay_stage := ""
 var _victory: Control
+var _reveal: PuertoPickReveal
+## Capa de efectos (cartas que vuelan, monedas flotantes): no captura clics.
+var _fx: Control
+var _player_rows: Array[Control] = []
+var _last_coins: Array[int] = []
 var _banner_queue: Array = []
 var _banner_busy := false
 
@@ -140,6 +145,8 @@ func _start(seed: int) -> void:
 	_overlay_kind = ""
 	_turn_revealed = -1
 	_focus = -1
+	_last_coins.clear()
+	_reveal.visible = false
 	_reset_mode()
 	var humans := _local_humans()
 	_hotseat_private = not _network and humans.size() > 1
@@ -361,6 +368,10 @@ func _build_right_panel() -> Control:
 
 
 func _build_overlays() -> void:
+	_fx = Control.new()
+	_fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fx)
 	_banner = _label("", 40)
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -378,6 +389,9 @@ func _build_overlays() -> void:
 	for side in ["right", "top", "bottom"]:
 		_overlay_dock.add_theme_constant_override("margin_" + side, 12)
 	_overlay.add_child(_overlay_dock)
+	_reveal = PuertoPickReveal.new()
+	add_child(_reveal)
+	_reveal.closed.connect(_refresh)
 	_victory = _modal(Color(0, 0, 0, 0.75))
 
 
@@ -433,6 +447,14 @@ func _reset_mode() -> void:
 
 func _refresh_players(pub: Dictionary) -> void:
 	_clear(_players_box)
+	_player_rows.clear()
+	var deltas := {}
+	for p in game.players:
+		if _last_coins.size() == game.players.size() and pub["coins"][p.id] != _last_coins[p.id]:
+			deltas[p.id] = pub["coins"][p.id] - _last_coins[p.id]
+	_last_coins.assign(pub["coins"])
+	if not deltas.is_empty():
+		_float_coins.call_deferred(deltas)
 	for p in game.players:
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 0)
@@ -460,6 +482,7 @@ func _refresh_players(pub: Dictionary) -> void:
 			var turn := _turn_player(pub) == p.id
 			col.add_child(_tag("%d. %s%s" % [office + 1, D.OFFICE_NAMES[office], "  ◀ turno" if turn else ""], 12, BGCTheme.ACCENT if turn else Color("9fc7c9")))
 		_players_box.add_child(col)
+		_player_rows.append(col)
 
 
 static func _plural(n: int, word: String) -> String:
@@ -798,7 +821,7 @@ func _on_cell_clicked(cell: int) -> void:
 ## Qué enseñar en la ventana privada: la elección secreta de cargo, o la
 ## cortina antes del turno de una persona (si hay varias en este equipo).
 func _update_overlay() -> void:
-	if game.finished:
+	if game.finished or _reveal.visible:
 		_overlay.visible = false
 		return
 	var want := {}
@@ -938,6 +961,11 @@ func _run_ai(generation: int) -> void:
 	_ai_pending = false
 	if game.finished:
 		return
+	if _reveal.visible:
+		# Se espera a que termine la revelación de los cargos.
+		_ai_pending = true
+		get_tree().create_timer(0.3).timeout.connect(_run_ai.bind(generation))
+		return
 	var actor := _ai_actor()
 	if actor == -1:
 		return
@@ -1030,16 +1058,20 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 			Sfx.play(&"click")
 		&"picks_revealed":
 			_add_log("[b]Se revelan los cargos:[/b]")
+			var entries: Array = []
 			for r in data["reveal"]:
 				var result := "se lo queda" if r["won"] else "[color=#ff8a80]pierde[/color]"
 				var paid := " y paga %d" % r["bid"] if r["won"] and r["bid"] > 0 else ""
 				_add_log("  %s quería %s (puja %d): %s%s." % [_player_name(r["player"]), D.OFFICE_NAMES[r["office"]], r["bid"], result, paid])
-			Sfx.play(&"seal")
+				var p := game.players[r["player"]]
+				entries.append({"name": p.display_name, "color": p.color, "office": r["office"], "bid": r["bid"], "won": r["won"]})
+			_banner_queue.clear()
+			_reveal.reveal(entries, 0.45 if _ai_fast_toggle.button_pressed else 1.0)
 		&"reassigned":
 			_add_log("%s se queda %s (vacante)." % [_player_name(data["player"]), D.OFFICE_NAMES[data["office"]]])
 		&"vacant_coins":
-			_add_log("%s recoge %d moneda%s acumuladas en %s." % [_player_name(data["player"]), data["coins"], "s" if data["coins"] > 1 else "", D.OFFICE_NAMES[data["office"]]])
-			Sfx.play(&"resource")
+			_add_log("%s recoge %s acumulada%s en %s." % [_player_name(data["player"]), _plural(data["coins"], "moneda"), "s" if data["coins"] > 1 else "", D.OFFICE_NAMES[data["office"]]])
+			Sfx.play(&"coins")
 		&"turn":
 			var pid: int = data["player"]
 			_focus = -1
@@ -1051,8 +1083,8 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 			var pid: int = data["player"]
 			match int(data["kind"]):
 				Income.COINS:
-					_add_log("%s cobra %d monedas." % [_player_name(pid), data["coins"]])
-					Sfx.play(&"resource")
+					_add_log("%s cobra %s." % [_player_name(pid), _plural(data["coins"], "moneda")])
+					Sfx.play(&"coins")
 				Income.DOCK:
 					_add_log("%s coge %s del muelle%s." % [_player_name(pid), _card_name(data["card"]), " (y roba otra con el Astillero Real)" if data["extra"] else ""])
 					Sfx.play(&"card")
@@ -1068,19 +1100,17 @@ func _on_game_event(kind: StringName, data: Dictionary) -> void:
 		&"collected":
 			var names: Array = data["payers"].map(func(pid: int) -> String: return game.players[pid].display_name)
 			_add_log("%s (Recaudadora) cobra 1 moneda de: %s." % [_player_name(data["player"]), ", ".join(names) if not names.is_empty() else "nadie"])
-			Sfx.play(&"trade")
+			Sfx.play(&"coins" if not names.is_empty() else &"click")
 		&"moved":
 			_add_log("%s (Urbanista) traslada un edificio." % _player_name(data["player"]))
 			Sfx.play(&"build")
 		&"patron":
-			_add_log("%s (Mecenas) cobra %d monedas." % [_player_name(data["player"]), data["coins"]])
-			Sfx.play(&"resource")
+			_add_log("%s (Mecenas) cobra %s." % [_player_name(data["player"]), _plural(data["coins"], "moneda")])
+			Sfx.play(&"coins")
 		&"built":
 			var pid: int = data["player"]
 			_add_log("%s construye %s por %d." % [_player_name(pid), _card_name(data["card"]), data["cost"]])
-			Sfx.play(&"build")
-			if _focus_seat(game.view_for(-1)) == pid:
-				_big_district.pulse(data["cell"])
+			_fly_card(pid, data["card"], data["cell"])
 		&"district_complete":
 			var pid: int = data["player"]
 			_add_log("[b]%s completa su barrio: la partida acaba al final de esta ronda.[/b]" % _player_name(pid))
@@ -1126,6 +1156,21 @@ func _show_victory() -> void:
 			grid.add_child(_tag(str(s[key]), 14 if key != "total" else 16, BGCTheme.ACCENT if key == "total" else BGCTheme.TEXT))
 	box.add_child(grid)
 	box.add_child(_label("Si hay empate a puntos, gana quien tenga más monedas.", 12, BGCTheme.TEXT_DIM))
+	var districts := HBoxContainer.new()
+	districts.alignment = BoxContainer.ALIGNMENT_CENTER
+	districts.add_theme_constant_override("separation", 10)
+	for pid in order:
+		var cell := VBoxContainer.new()
+		var view := PuertoDistrictView.new()
+		view.custom_minimum_size = Vector2(130, 120)
+		view.owner_color = game.players[pid].color
+		view.set_district(game.districts[pid])
+		cell.add_child(view)
+		var name_label := _tag(game.players[pid].display_name, 13, game.players[pid].color.lightened(0.3))
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(name_label)
+		districts.add_child(cell)
+	box.add_child(districts)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	if not _network:
@@ -1146,6 +1191,9 @@ func _show_victory() -> void:
 # --- Utilidades ---------------------------------------------------------------------
 
 func _show_banner(text: String, color: Color) -> void:
+	# Si la IA va deprisa, no se acumulan: se queda el más reciente.
+	while _banner_queue.size() >= 1:
+		_banner_queue.pop_front()
 	_banner_queue.append([text, color])
 	if not _banner_busy:
 		_next_banner()
@@ -1164,8 +1212,8 @@ func _next_banner() -> void:
 	var tween := create_tween()
 	tween.tween_property(_banner, "modulate:a", 1.0, 0.12)
 	tween.parallel().tween_property(_banner, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(0.6)
-	tween.tween_property(_banner, "modulate:a", 0.0, 0.3)
+	tween.tween_interval(0.25 if _ai_fast_toggle.button_pressed else 0.6)
+	tween.tween_property(_banner, "modulate:a", 0.0, 0.25)
 	tween.tween_callback(_next_banner)
 
 
@@ -1193,3 +1241,58 @@ func _player_name(pid: int) -> String:
 
 func _card_name(card: int) -> String:
 	return "[color=#%s]%s[/color]" % [PuertoArt.guild_color(D.guild_of(card)).lightened(0.3).to_html(false), D.card_name(card)]
+
+
+## Carta que vuela a su casilla al construir (desde la mano si se ve, o
+## desde la fila del jugador), con martillazos y un destello al llegar.
+func _fly_card(pid: int, card: int, cell: int) -> void:
+	var pub := game.view_for(-1)
+	var big := _focus_seat(pub) == pid
+	var start := Vector2.ZERO
+	if _hand_seat() == pid and _hand_box.get_child_count() > 0:
+		start = _hand_box.get_global_rect().get_center()
+	elif pid < _player_rows.size():
+		start = _player_rows[pid].get_global_rect().get_center()
+	var target := _big_district.global_position + _big_district.cell_center(cell) if big else _big_title.get_global_rect().get_center()
+	if not big:
+		for child in _rivals_box.get_children():
+			if child.get_child_count() > 1 and child.get_child(1) is PuertoDistrictView and child.get_child(1).owner_color == game.players[pid].color:
+				var view: PuertoDistrictView = child.get_child(1)
+				target = view.global_position + view.cell_center(cell)
+	var fly := Card.new(card, HAND_CARD)
+	fly.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fly.pivot_offset = HAND_CARD / 2.0
+	fly.position = start - HAND_CARD / 2.0 - _fx.global_position
+	_fx.add_child(fly)
+	var fast := _ai_fast_toggle.button_pressed and game.players[pid].is_ai
+	var time := 0.25 if fast else 0.45
+	var tween := fly.create_tween()
+	tween.tween_property(fly, "position", target - HAND_CARD / 2.0 - _fx.global_position, time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tween.parallel().tween_property(fly, "scale", Vector2.ONE * 0.25, time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(func() -> void:
+		Sfx.play(&"hammer")
+		if _focus_seat(game.view_for(-1)) == pid:
+			_big_district.pulse(cell))
+	tween.tween_property(fly, "modulate:a", 0.0, 0.1)
+	tween.tween_callback(fly.queue_free)
+
+
+## Cifras flotantes junto a cada jugador cuando cambian sus monedas.
+func _float_coins(deltas: Dictionary) -> void:
+	# Las filas se acaban de crear: se espera a que el contenedor las coloque.
+	await get_tree().process_frame
+	for pid in deltas:
+		if pid >= _player_rows.size() or not is_instance_valid(_player_rows[pid]):
+			continue
+		var delta: int = deltas[pid]
+		var rect := _player_rows[pid].get_global_rect()
+		var label := _tag(("+%d" if delta > 0 else "%d") % delta, 18, Color("e8b94a") if delta > 0 else ERROR_COLOR)
+		label.add_theme_color_override("font_outline_color", Color.BLACK)
+		label.add_theme_constant_override("outline_size", 5)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.position = Vector2(rect.end.x - 40, rect.position.y + 14) - _fx.global_position
+		_fx.add_child(label)
+		var tween := label.create_tween()
+		tween.tween_property(label, "position:y", label.position.y - 22, 0.9).set_ease(Tween.EASE_OUT)
+		tween.parallel().tween_property(label, "modulate:a", 0.0, 0.9).set_delay(0.3)
+		tween.tween_callback(label.queue_free)

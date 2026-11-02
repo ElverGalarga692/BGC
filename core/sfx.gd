@@ -42,6 +42,10 @@ func _ready() -> void:
 		&"thunder": _thunder(),
 		&"gull": _gull(),
 		&"wave": _wave(),
+		# Puerto Franco
+		&"coins": _coins(),
+		&"hammer": _hammer(),
+		&"reveal": _tone([587.33, 880.0, 1174.66], 0.07, 0.18, 0.35),
 	}
 	for sound in _streams.keys():
 		for ext in ["wav", "ogg"]:
@@ -295,4 +299,38 @@ func _wave() -> AudioStreamWAV:
 		a = a * 0.7 + rng.randf_range(-1.0, 1.0) * 0.3
 		var env := pow(sin(PI * minf(t / 1.3, 1.0)), 2.0) * (1.0 + 0.6 * exp(-pow((t - 0.7) * 6.0, 2.0)))
 		s[i] = 0.4 * env * a
+	return _to_stream(s)
+
+
+## Monedas: tintineos metálicos cortos (parciales inarmónicos).
+func _coins() -> AudioStreamWAV:
+	var s := _buffer(0.45)
+	var hits := [[0.0, 2600.0], [0.07, 3100.0], [0.13, 2850.0], [0.22, 3400.0]]
+	for h in hits:
+		var start: int = int(float(h[0]) * RATE)
+		var f: float = h[1]
+		for i in int(0.2 * RATE):
+			if start + i >= s.size():
+				break
+			var t := float(i) / RATE
+			var env := exp(-t * 28.0) * minf(1.0, t * 2000.0)
+			s[start + i] += 0.16 * env * (sin(TAU * f * t) + 0.6 * sin(TAU * f * 2.76 * t) + 0.3 * sin(TAU * f * 5.4 * t))
+	return _to_stream(s)
+
+
+## Martillazos: tres golpes secos de madera.
+func _hammer() -> AudioStreamWAV:
+	var s := _buffer(0.5)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	for n in 3:
+		var start := int(n * 0.14 * RATE)
+		var pitch := 210.0 - n * 25.0
+		for i in int(0.12 * RATE):
+			if start + i >= s.size():
+				break
+			var t := float(i) / RATE
+			var knock := sin(TAU * pitch * t) * exp(-t * 45.0)
+			var crack := rng.randf_range(-1.0, 1.0) * exp(-t * 400.0)
+			s[start + i] += 0.5 * knock + 0.3 * crack
 	return _to_stream(s)

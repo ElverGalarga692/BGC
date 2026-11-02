@@ -142,8 +142,12 @@ games/puerto_franco/     Puerto Franco
                          puja, vacantes, turnos, habilidades, construir y final
     puerto_ai.gd         IA (fácil, normal y difícil); solo usa view_for
   view/
-    puerto_art.gd        Cartas de edificio dibujadas por código y PuertoCard
-    district_view.gd     Barrio hexagonal: dibujo, casillas pulsables, brillo
+    puerto_art.gd        Dibujo por código: edificios según gremio y coste,
+                         una ilustración por maravilla, emblemas de los
+                         cargos, cartas y PuertoCard
+    district_view.gd     Barrio hexagonal: edificios en sus casillas, grupos
+                         unidos, casillas pulsables y destello al construir
+    pick_reveal.gd       Revelación animada de los cargos elegidos
     puerto_screen.gd     Pantalla: consejo, barrio grande, muelle, objetivos,
                          barrios rivales, mano y acciones; ventana privada
                          con cortina para elegir cargo y antes de cada turno
@@ -403,8 +407,19 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       protocolo de red pasa a `bgc-4`: un equipo con una versión anterior
       (sin Puerto Franco) recibe el aviso de versión distinta en vez de
       fallar al empezar.
-- [ ] **Puerto Franco, fase 5:** pulido (cartas y edificios dibujados por
-      código, animaciones y sonidos).
+- [x] **Puerto Franco, fase 5: pulido.** Edificios dibujados por código
+      que crecen con el coste (más pisos, ventanas, grúas, cúpulas...) y una
+      ilustración propia para cada maravilla (mercado, arsenal, plaza con
+      fuente, aduana con balanza, astillero, jardines, faro con haz de
+      luz...). El barrio se ve como una isla de arena rodeada de mar, con
+      cada edificio en su casilla, su coste y los grupos de vecinos unidos
+      por un trazo del color del gremio. Al resolver la elección, una ficha
+      por jugador se da la vuelta y enseña su cargo y su puja (las que
+      pierden quedan tachadas). Al construir, la carta vuela a su casilla
+      con martillazos y un destello; cuando cambian las monedas de alguien
+      sale una cifra flotante junto a su nombre. Sonidos nuevos (monedas,
+      martillo y revelación). La pantalla final enseña el barrio de cada
+      jugador. Con la IA rápida los rótulos ya no se acumulan.
 
 ### Opciones de cada juego
 

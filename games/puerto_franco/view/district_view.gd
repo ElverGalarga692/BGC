@@ -62,20 +62,41 @@ func _draw() -> void:
 		return
 	var font := ThemeDB.fallback_font
 	var font_size := int(clampf(_hex * 0.42, 7, 15))
+	var detailed := _hex >= 14.0
+	# Suelo: arena dentro y mar alrededor.
+	draw_circle(_origin, _hex * 4.6, Color("1d4a5c"))
+	draw_arc(_origin, _hex * 4.6, 0, TAU, 64, Color(owner_color, 0.55), 2.0, true)
+	draw_circle(_origin, _hex * 4.25, Color("3a3428"))
+	# Casillas.
 	for cell in district.size():
 		var c := cell_center(cell)
 		var points := HexCoords.corners(c, _hex * 0.95)
 		var content: int = district[cell]
-		var fill := Color(1, 1, 1, 0.06)
+		var fill := Color(1, 1, 1, 0.05)
 		if content == D.LONJA:
 			fill = PuertoArt.LONJA
 		elif content >= 0:
-			fill = PuertoArt.guild_color(D.guild_of(content))
+			fill = PuertoArt.guild_color(D.guild_of(content)).darkened(0.45)
 		if cell in targets:
-			fill = fill.lerp(Color("ffd166"), 0.35) if content != D.EMPTY else Color(1, 0.82, 0.4, 0.25 + (0.2 if cell == _hover else 0.0))
+			fill = fill.lerp(Color("ffd166"), 0.35) if content != D.EMPTY else Color(1, 0.82, 0.4, 0.22 + (0.2 if cell == _hover else 0.0))
 		draw_colored_polygon(points, fill)
-		var border := Color(1, 1, 1, 0.18)
+	# Grupos: trazos entre vecinos del mismo grupo.
+	for g in D.groups(district):
+		var color: Color = PuertoArt.guild_color(g["guild"]).lightened(0.2)
+		var cells: Array = g["cells"]
+		for a in cells:
+			for b in D.cell_neighbors(a):
+				if b > a and b in cells:
+					draw_line(cell_center(a), cell_center(b), Color(color, 0.85), maxf(2.0, _hex * 0.22), true)
+	for cell in district.size():
+		var c := cell_center(cell)
+		var points := HexCoords.corners(c, _hex * 0.95)
+		var content: int = district[cell]
+		var border := Color(1, 1, 1, 0.16)
 		var width := 1.0
+		if content >= 0:
+			border = PuertoArt.guild_color(D.guild_of(content)).lightened(0.25)
+			width = 1.5
 		if cell == selected:
 			border = Color("ffd166")
 			width = 3.0
@@ -86,14 +107,25 @@ func _draw() -> void:
 		if flash.has(cell):
 			draw_colored_polygon(points, Color(1, 1, 0.8, 0.6 * flash[cell]))
 		if content == D.LONJA:
-			draw_string(font, c + Vector2(-_hex, font_size * 0.35), "Lonja", HORIZONTAL_ALIGNMENT_CENTER, _hex * 2.0, font_size, PuertoArt.INK)
+			if detailed:
+				PuertoArt.house(self, Rect2(c + Vector2(-_hex * 0.45, -_hex * 0.05), Vector2(_hex * 0.9, _hex * 0.45)), Color("8a6f45"), Color("5c4528"), 0, 3, true)
+				draw_string(font, c + Vector2(-_hex, _hex * 0.75), "Lonja", HORIZONTAL_ALIGNMENT_CENTER, _hex * 2.0, int(font_size * 0.8), PuertoArt.PAPER)
+			else:
+				draw_circle(c, _hex * 0.3, Color("8a6f45"))
 		elif content >= 0:
-			var label: String = str(D.cost_of(content))
-			if D.is_wonder(content):
-				PuertoArt.star(self, c + Vector2(0, -_hex * 0.38), _hex * 0.22, Color("ffd166"))
-			draw_string(font, c + Vector2(-_hex, font_size * 0.4), label, HORIZONTAL_ALIGNMENT_CENTER, _hex * 2.0, int(font_size * 1.25), Color.WHITE)
-	# Contorno del barrio con el color del jugador.
-	draw_arc(_origin, _hex * 4.6, 0, TAU, 48, Color(owner_color, 0.35), 1.5, true)
+			var guild := D.guild_of(content)
+			var color := PuertoArt.guild_color(guild)
+			if detailed:
+				var art := Rect2(c - Vector2(_hex * 0.55, _hex * 0.62), Vector2(_hex * 1.1, _hex * 1.05))
+				if D.is_wonder(content):
+					PuertoArt.wonder_icon(self, art, content)
+				else:
+					PuertoArt.building_icon(self, art, guild, color, D.cost_of(content))
+				PuertoArt.coin(self, c + Vector2(_hex * 0.48, _hex * 0.45), _hex * 0.24, D.cost_of(content))
+			else:
+				draw_circle(c, _hex * 0.5, color)
+				if D.is_wonder(content):
+					PuertoArt.star(self, c, _hex * 0.35, Color("ffd166"))
 
 
 func _cell_at(pos: Vector2) -> int:
