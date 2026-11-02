@@ -393,7 +393,16 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       pantalla final con el desglose y guardado automático. El juego ya
       aparece en el menú. Probado con partidas completas en la pantalla
       real (IAs y una persona, y la cortina con dos).
-- [ ] **Puerto Franco, fase 4:** red local (elección simultánea sin revelar).
+- [x] **Puerto Franco, fase 4: red local.** Hasta 6 jugadores por red. Cada
+      equipo elige su cargo en su propia ventana privada (sin cortina) y solo
+      ve su mano; de los demás solo ve quién ha elegido ya. Probado con un
+      anfitrión y dos clientes en partidas completas: todos terminan con el
+      mismo historial. También con un cliente que se desconecta a mitad de
+      partida y con uno que se va sin haber elegido cargo: una IA ocupa su
+      plaza (y elige por él) y los demás acaban igual. La versión del
+      protocolo de red pasa a `bgc-4`: un equipo con una versión anterior
+      (sin Puerto Franco) recibe el aviso de versión distinta en vez de
+      fallar al empezar.
 - [ ] **Puerto Franco, fase 5:** pulido (cartas y edificios dibujados por
       código, animaciones y sonidos).
 

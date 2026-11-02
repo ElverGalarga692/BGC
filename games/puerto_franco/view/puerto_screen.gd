@@ -923,7 +923,7 @@ func _place_overlay(centered: bool) -> void:
 # --- IA ---------------------------------------------------------------------------
 
 func _schedule_ai() -> void:
-	if game.finished or _ai_pending or not is_inside_tree() or _ai_actor() == -1:
+	if game.finished or _ai_pending or _awaiting_host or not is_inside_tree() or _ai_actor() == -1:
 		return
 	_ai_pending = true
 	var delay := AI_DELAY_FAST if _ai_fast_toggle.button_pressed else AI_DELAY

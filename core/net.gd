@@ -27,7 +27,7 @@ signal disconnected(reason: String)
 
 const PORT := 47810
 const DISCOVERY_PORT := 47811
-const PROTOCOL := "bgc-3"
+const PROTOCOL := "bgc-4"
 ## Conexiones máximas del servidor y plazas máximas de cualquier juego
 ## (cada juego puede admitir menos: max_players).
 const MAX_CONNECTIONS := 16
