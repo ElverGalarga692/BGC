@@ -11,12 +11,16 @@ extends Node
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path . \
 ##       --rendering-driver opengl3 res://tools/reglas/capture_<juego>.tscn -- <carpeta>
 
-const NAMES := ["Ana", "Bruno", "Carla", "David", "Elena", "Fran"]
+const NAMES := ["Ana", "Bruno", "Carla", "David", "Elena", "Fran", "Gael", "Hugo", "Irene", "Julia"]
 
 var seed_value := 20261102
 var player_count := 3
 var options := {}
 var game_id := ""
+## Asientos que la pantalla trata como IA (para que el resto se vea como lo
+## vería una persona). Sus IAs no llegan a jugar: la pantalla se congela en
+## el momento elegido.
+var screen_ai_seats: Array[int] = []
 
 var _out := "user://capturas"
 var _history: Array = []
@@ -30,6 +34,7 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(_out)
 	get_window().size = Vector2i(1600, 900)
 	_history = play_full_game()
+	_prepare()
 	await _shoot_all()
 	get_tree().quit()
 
@@ -48,16 +53,28 @@ func _screen_scene() -> PackedScene:
 	return null
 
 
+## Opcional: se llama tras jugar la partida (p. ej. para buscar otra semilla
+## con una partida más interesante de enseñar).
+func _prepare() -> void:
+	pass
+
+
 func _shoot_all() -> void:
+	pass
+
+
+## Opcional: retoca la pantalla recién cargada con `n` jugadas.
+func _on_screen_loaded(_n: int) -> void:
 	pass
 
 
 # --- Partida -------------------------------------------------------------------
 
-func players() -> Array[PlayerInfo]:
+func players(for_screen: bool = false) -> Array[PlayerInfo]:
 	var result: Array[PlayerInfo] = []
 	for i in player_count:
-		result.append(PlayerInfo.new(i, NAMES[i], PlayerInfo.default_color(i)))
+		var level := PlayerInfo.AILevel.NORMAL if for_screen and i in screen_ai_seats else PlayerInfo.AILevel.HUMAN
+		result.append(PlayerInfo.new(i, NAMES[i], PlayerInfo.default_color(i), level))
 	return result
 
 
@@ -110,7 +127,7 @@ func action_type(n: int) -> StringName:
 
 ## Abre la pantalla del juego con las primeras `n` jugadas. Las últimas
 ## `live` se juegan con la pantalla ya abierta, para que salgan en el registro.
-func load_state(n: int, live: int = 6, settings := {}) -> void:
+func load_state(n: int, live: int = 6, settings := {}, wait: float = 2.6) -> void:
 	if _screen != null:
 		_screen.queue_free()
 		await get_tree().process_frame
@@ -118,21 +135,26 @@ func load_state(n: int, live: int = 6, settings := {}) -> void:
 		App.set_setting(key, settings[key])
 	App.session = {
 		"game_id": game_id,
-		"players": players(),
+		"players": players(true),
 		"seed": seed_value,
 		"history": _history.slice(0, n - mini(live, n)),
 		"options": options.duplicate(),
 	}
 	_screen = _screen_scene().instantiate()
 	add_child(_screen)
+	# Las IAs de la pantalla no juegan: invalida la jugada que ya hayan
+	# programado y no deja programar más.
+	_screen._ai_generation += 1
+	_screen._ai_pending = true
 	await get_tree().process_frame
 	_screen._log.clear()
 	_screen._log_label.clear()
 	for i in range(n - mini(live, n), n):
 		_screen.game.submit(GameAction.from_dict(_history[i]))
+	_on_screen_loaded(n)
 	# El ratón, fuera del tablero (si no, sale la información de la casilla).
 	get_viewport().warp_mouse(Vector2(4, 896))
-	await settle(2.6)
+	await settle(wait)
 
 
 func settle(seconds: float = 1.8) -> void:

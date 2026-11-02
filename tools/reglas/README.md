@@ -22,7 +22,8 @@ Los PDF están en `docs/reglas/`. Cada uno se genera en dos pasos:
    ```
 
    Para Pests!: `capture_pests.tscn` y `build_pests.py` (salida
-   `docs/reglas/pests.pdf`).
+   `docs/reglas/pests.pdf`). Para La Conjura: `capture_conjura.tscn` y
+   `build_conjura.py` (salida `docs/reglas/conjura.pdf`).
 
 `pdf_common.py` tiene los estilos y piezas que comparten todos los
 reglamentos (portada, figuras, tablas, recuadros).
