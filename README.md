@@ -133,7 +133,7 @@ games/bajamar/           Bajamar
     bajamar_screen.gd    Pantalla: marcador, mesa (mazo, mercado, descartes),
                          barcas con sus redes, acciones con los puntos de
                          cada opción, resumen de ronda y pantalla final
-games/puerto_franco/     Puerto Franco (en desarrollo, aún no está en el menú)
+games/puerto_franco/     Puerto Franco
   rules.txt              Reglas del juego
   logic/
     puerto_defs.gd       Gremios, edificios y maravillas (cartas = enteros),
@@ -141,6 +141,12 @@ games/puerto_franco/     Puerto Franco (en desarrollo, aún no está en el menú
     puerto_game.gd       La partida (GameBase): elección secreta de cargos con
                          puja, vacantes, turnos, habilidades, construir y final
     puerto_ai.gd         IA (fácil, normal y difícil); solo usa view_for
+  view/
+    puerto_art.gd        Cartas de edificio dibujadas por código y PuertoCard
+    district_view.gd     Barrio hexagonal: dibujo, casillas pulsables, brillo
+    puerto_screen.gd     Pantalla: consejo, barrio grande, muelle, objetivos,
+                         barrios rivales, mano y acciones; ventana privada
+                         con cortina para elegir cargo y antes de cada turno
 tests/                   Tests sin dependencias externas (test_*.gd)
 ```
 
@@ -371,9 +377,22 @@ repiten (`GameBase.replay()`). Se guarda automáticamente tras cada jugada en
       normales; lo justo es 25 %). Lo que más pesa es cuánto vale una
       moneda frente a construir (con 0,5 la IA ganaba el 11 %; con 1,1, lo
       mejor), y ese ajuste ya lo tienen las dos.
-- [ ] **Puerto Franco, fase 3:** pantalla 2D (mesa de cargos, mano, barrio
-      y barrios rivales), cortina de «Pasa el dispositivo» para la elección
-      secreta y entrada en el menú.
+- [x] **Puerto Franco, fase 3: pantalla.** Arriba, el consejo con los 7
+      cargos (quién tiene cada uno, las monedas de los vacantes y el turno en
+      curso); en el centro, el barrio grande del que juega (o del que se
+      pulse), el muelle, el mazo y quién va ganando cada objetivo; debajo,
+      los barrios de los rivales y la mano. Para construir se pulsa una
+      carta (las que no se pueden pagar salen apagadas) y luego una casilla
+      resaltada; para cobrar del muelle o usar la Capitana se pulsa una
+      carta del muelle, y la Urbanista traslada pulsando origen y destino.
+      La elección de cargo y puja se hace en una ventana privada acoplada a
+      la derecha; si juegan varias personas en el mismo equipo, antes sale
+      la cortina de «Pasa el dispositivo», y también al empezar el turno de
+      cada una (para que solo ella vea su mano). Registro con todo lo
+      público, rótulos y sonidos, puntos del barrio en cada momento,
+      pantalla final con el desglose y guardado automático. El juego ya
+      aparece en el menú. Probado con partidas completas en la pantalla
+      real (IAs y una persona, y la cortina con dos).
 - [ ] **Puerto Franco, fase 4:** red local (elección simultánea sin revelar).
 - [ ] **Puerto Franco, fase 5:** pulido (cartas y edificios dibujados por
       código, animaciones y sonidos).

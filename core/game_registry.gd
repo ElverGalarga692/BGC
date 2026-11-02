@@ -50,6 +50,17 @@ static func all_games() -> Array[Dictionary]:
 			# Colores del emblema de la tarjeta del menú (las especies).
 			"colors": [Color("9fb8c8"), Color("3f8f8a"), Color("c4566b"), Color("d9c48c"), Color("3f5fa8"), Color("1f5f86")],
 		},
+		{
+			"id": "puerto_franco",
+			"name": "Puerto Franco",
+			"description": "Puja en secreto por los cargos del consejo y levanta tu barrio de mercaderes alrededor de la Lonja.",
+			"scene": "res://games/puerto_franco/puerto_franco.tscn",
+			"rules": "res://games/puerto_franco/rules.txt",
+			"min_players": 2,
+			"max_players": 6,
+			# Colores del emblema de la tarjeta del menú (los gremios).
+			"colors": [Color("d9a440"), Color("3f7fb8"), Color("b8583f"), Color("7f5bb0"), Color("3f9f7a"), Color("c9b48a")],
+		},
 	]
 
 
