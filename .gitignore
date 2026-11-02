@@ -8,3 +8,4 @@ export_credentials.cfg
 
 # Copias de seguridad de Blender
 *.blend1
+__pycache__/
