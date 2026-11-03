@@ -21,6 +21,33 @@ Juegos:
 - **La Conjura**: roles ocultos y deducción social; la Guardia Real
   contra la Hermandad de la Sombra y su Usurpador (5–10 jugadores).
 
+## Ejecutables listos para jugar
+
+No hace falta instalar Godot: en la carpeta `build/` hay un ejecutable por
+sistema, de un solo archivo (el juego va dentro).
+
+- **Windows**: `build/windows/BGC.exe`. Doble clic para abrirlo. Si
+  Windows SmartScreen avisa ("Windows protegió su PC"), pulsa
+  "Más información" y luego "Ejecutar de todas formas": el aviso sale
+  porque el ejecutable no está firmado.
+- **Linux**: `build/linux/BGC.x86_64`. Si no arranca con doble clic, dale
+  permiso de ejecución con `chmod +x BGC.x86_64`.
+
+Para el juego en red local, cada jugador abre el ejecutable en su equipo.
+Las partidas guardadas y los ajustes se guardan en la carpeta de datos de
+usuario de Godot (`%APPDATA%\Godot\app_userdata\BGC` en Windows).
+
+Para regenerarlos tras cambiar el código (Godot 4.3 con las plantillas de
+exportación instaladas):
+
+```bash
+godot --headless --path . --export-release "Windows" build/windows/BGC.exe
+```
+
+```bash
+godot --headless --path . --export-release "Linux" build/linux/BGC.x86_64
+```
+
 ## Cómo ejecutarlo
 
 1. Abre la carpeta del proyecto con Godot 4.3 o superior.
