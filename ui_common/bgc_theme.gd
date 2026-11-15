@@ -39,6 +39,40 @@ static func box(bg: Color, border: Color = Color.TRANSPARENT, radius: int = 12, 
 	return s
 
 
+## Pieza de una barra de desplazamiento (8 px de grosor).
+static func _bar(color: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = color
+	s.set_corner_radius_all(4)
+	s.set_content_margin_all(4)
+	s.anti_aliasing = true
+	return s
+
+
+## Icono de casilla (22 px): un recuadro con borde claro y, si está
+## marcada, relleno del color de acento con una marca oscura.
+static func _check_icon(checked: bool) -> ImageTexture:
+	const N := 22
+	var image := Image.create(N, N, false, Image.FORMAT_RGBA8)
+	var mark := [Vector2(5.5, 11.5), Vector2(9.5, 15.5), Vector2(16.5, 6.5)]
+	for y in N:
+		for x in N:
+			var p := Vector2(x + 0.5, y + 0.5)
+			# Distancia al borde de un cuadrado redondeado (radio 5).
+			var q := (p - Vector2(N, N) / 2.0).abs() - Vector2(N / 2.0 - 6.0, N / 2.0 - 6.0)
+			var d := Vector2(maxf(q.x, 0.0), maxf(q.y, 0.0)).length() + minf(maxf(q.x, q.y), 0.0) - 5.0
+			var color := Color(ACCENT if checked else BORDER, clampf(-d, 0.0, 1.0))
+			if d < -2.0:
+				color = ACCENT_DARK if checked else Color("10263d")
+			if checked:
+				var m := minf(
+					Geometry2D.get_closest_point_to_segment(p, mark[0], mark[1]).distance_to(p),
+					Geometry2D.get_closest_point_to_segment(p, mark[1], mark[2]).distance_to(p))
+				color = color.lerp(Color("2a1d05"), clampf(2.0 - m, 0.0, 1.0))
+			image.set_pixel(x, y, color)
+	return ImageTexture.create_from_image(image)
+
+
 ## Fuente por defecto en negrita.
 static func bold_font(strength: float = 0.7) -> FontVariation:
 	var f := FontVariation.new()
@@ -110,6 +144,28 @@ static func build() -> Theme:
 	t.set_stylebox("pressed", "CheckButton", box(Color(1, 1, 1, 0.06), Color(1, 1, 1, 0.14), 12, 1, 0))
 	t.set_stylebox("hover_pressed", "CheckButton", box(Color(1, 1, 1, 0.09), Color(ACCENT, 0.6), 12, 1, 0))
 	t.set_stylebox("focus", "CheckButton", box(Color.TRANSPARENT, Color(ACCENT, 0.5), 12, 1, 0))
+	# Casillas de opciones: sin caja de botón, solo se ilumina al pasar.
+	for state in ["normal", "pressed", "disabled"]:
+		t.set_stylebox(state, "CheckBox", box(Color.TRANSPARENT, Color.TRANSPARENT, 10, 0, 0, 3))
+	for state in ["hover", "hover_pressed"]:
+		t.set_stylebox(state, "CheckBox", box(Color(1, 1, 1, 0.07), Color.TRANSPARENT, 10, 0, 0, 3))
+	t.set_stylebox("focus", "CheckBox", box(Color.TRANSPARENT, Color(ACCENT, 0.5), 10, 1, 0, 3))
+	t.set_icon("unchecked", "CheckBox", _check_icon(false))
+	t.set_icon("checked", "CheckBox", _check_icon(true))
+	t.set_constant("h_separation", "CheckBox", 10)
+	t.set_color("font_color", "CheckBox", TEXT)
+	t.set_color("font_hover_color", "CheckBox", Color.WHITE)
+	t.set_color("font_pressed_color", "CheckBox", TEXT)
+	t.set_color("font_hover_pressed_color", "CheckBox", Color.WHITE)
+
+	# Barras de desplazamiento finas.
+	for bar in ["VScrollBar", "HScrollBar"]:
+		t.set_stylebox("scroll", bar, _bar(Color(1, 1, 1, 0.05)))
+		t.set_stylebox("scroll_focus", bar, _bar(Color(1, 1, 1, 0.05)))
+		t.set_stylebox("grabber", bar, _bar(Color(BORDER, 0.8)))
+		t.set_stylebox("grabber_highlight", bar, _bar(ACCENT_DARK))
+		t.set_stylebox("grabber_pressed", bar, _bar(ACCENT))
+
 	t.set_stylebox("slider", "HSlider", box(Color("10263d"), BORDER, 6, 1, 0, 3))
 	t.set_stylebox("grabber_area", "HSlider", box(ACCENT_DARK, Color.TRANSPARENT, 6, 0, 0, 3))
 	t.set_stylebox("grabber_area_highlight", "HSlider", box(ACCENT, Color.TRANSPARENT, 6, 0, 0, 3))

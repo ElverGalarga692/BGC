@@ -22,6 +22,8 @@ static func all_games() -> Array[Dictionary]:
 			"rules": "res://games/pests/rules.txt",
 			"min_players": 2,
 			"max_players": 6,
+			# Colores del emblema de la tarjeta del menú (las plagas).
+			"colors": [Color("e3b34c"), Color("7fb04a"), Color("b8583f"), Color("8a6f4d"), Color("c9c2a8"), Color("6f4a8a")],
 			"options": [
 				{"key": "quick_species", "label": "Reglas rápidas: exterminadores y cartas al azar", "default": false},
 				{"key": "auto_house", "label": "Construir la casa al azar", "default": true},

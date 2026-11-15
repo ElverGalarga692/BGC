@@ -2,18 +2,33 @@ extends Control
 ## Menú principal: elegir juego, configurar los jugadores locales (todos en
 ## el mismo equipo, por turnos), continuar la partida guardada y ajustes.
 ##
-## Diseño: fondo animado (MenuBackground), tema propio (BGCTheme), tarjetas
-## de juego con ilustración y páginas que aparecen con una transición.
+## Diseño: fondo animado (MenuBackground), tema propio (BGCTheme), barra
+## superior fija y, debajo, una zona que se desplaza con la rueda del ratón:
+## la cuadrícula de tarjetas de juego o la página elegida (jugadores, sala
+## de espera, ajustes).
 
 const MAX_NAME_LENGTH := 16
-const COLUMN_WIDTH := 580.0
+## Ancho de las páginas de formulario (jugadores, sala de espera, ajustes).
+const FORM_WIDTH := 620.0
+## Tarjetas de juego: tamaño, separación y columnas como máximo.
+const CARD_SIZE := Vector2(352, 252)
+const CARD_GAP := 18
+const MAX_COLUMNS := 3
+const BANNER_HEIGHT := 86.0
+## Margen lateral de la pantalla.
+const SIDE_MARGIN := 36
 ## Filas de jugadores visibles sin desplazar (y su altura aproximada).
 const MAX_VISIBLE_ROWS := 5
-const PLAYER_ROW_HEIGHT := 54.0
+const PLAYER_ROW_HEIGHT := 56.0
 const LOBBY_ROW_HEIGHT := 58.0
 
-var _pages: Control
+var _scroll: ScrollContainer
+var _pages: VBoxContainer
 var _games_box: VBoxContainer
+var _cards_box: VBoxContainer
+var _cards: Array[Button] = []
+var _columns := 0
+var _settings_button: Button
 var _setup_box: VBoxContainer
 var _settings_box: VBoxContainer
 var _lobby_box: VBoxContainer
@@ -37,32 +52,50 @@ func _ready() -> void:
 	theme = BGCTheme.build()
 	add_child(MenuBackground.new())
 
+	var layout := VBoxContainer.new()
+	layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layout.add_theme_constant_override("separation", 0)
+	add_child(layout)
+	layout.add_child(_build_top_bar())
+
+	# Zona central: todo lo que no quepa se desplaza con la rueda del ratón.
+	_scroll = ScrollContainer.new()
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.follow_focus = true
+	layout.add_child(_scroll)
 	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-	var column := VBoxContainer.new()
-	column.custom_minimum_size = Vector2(COLUMN_WIDTH, 0)
-	column.add_theme_constant_override("separation", 18)
-	center.add_child(column)
-
-	column.add_child(_build_header())
-
-	var glass := PanelContainer.new()
-	column.add_child(glass)
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(center)
+	# El margen deja sitio a las sombras y al agrandado de las tarjetas.
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", SIDE_MARGIN)
+	margin.add_theme_constant_override("margin_right", SIDE_MARGIN)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	center.add_child(margin)
 	_pages = VBoxContainer.new()
-	glass.add_child(_pages)
-	_games_box = _page()
-	_setup_box = _page()
-	_settings_box = _page()
-	_lobby_box = _page()
+	margin.add_child(_pages)
+
+	_games_box = VBoxContainer.new()
+	_games_box.add_theme_constant_override("separation", 14)
+	_games_box.visible = false
+	_pages.add_child(_games_box)
+	_setup_box = _form_page()
+	_settings_box = _form_page()
+	_lobby_box = _form_page()
 	_build_game_list()
 	_build_settings()
 
 	var footer := _label("Multijugador local · Hecho con Godot", 12, BGCTheme.TEXT_DIM)
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	footer.modulate.a = 0.6
-	column.add_child(footer)
+	footer.custom_minimum_size.y = 26
+	layout.add_child(footer)
 
+	resized.connect(_layout_cards)
+	_layout_cards()
 	_show_page(_games_box, false)
 	Net.lobby_changed.connect(_on_lobby_changed)
 	Net.hosts_changed.connect(_refresh_hosts)
@@ -73,52 +106,95 @@ func _ready() -> void:
 	if App.menu_notice != "":
 		_show_notice(App.menu_notice)
 		App.menu_notice = ""
-	# Entrada: la columna aparece desde abajo.
-	column.modulate.a = 0.0
-	var intro := create_tween().set_parallel()
-	intro.tween_property(column, "modulate:a", 1.0, 0.6)
-	column.position.y += 30
-	intro.tween_property(column, "position:y", column.position.y - 30, 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# Entrada: el menú aparece poco a poco.
+	layout.modulate.a = 0.0
+	create_tween().tween_property(layout, "modulate:a", 1.0, 0.5)
+
+
+## Esc vuelve a la lista de juegos desde los ajustes o la página de jugadores.
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	if _is_shown(_settings_box) or _is_shown(_setup_box):
+		Net.stop_discovery()
+		_show_page(_games_box)
+		get_viewport().set_input_as_handled()
 
 
 # --- Piezas de la interfaz -------------------------------------------------------------
 
-func _build_header() -> Control:
-	var header := HBoxContainer.new()
-	header.alignment = BoxContainer.ALIGNMENT_CENTER
-	header.add_theme_constant_override("separation", 22)
-	header.add_child(HexEmblem.new([], 116, 0.12))
+## Barra superior fija: emblema y título a la izquierda, ajustes y salir a
+## la derecha.
+func _build_top_bar() -> Control:
+	var bar := MarginContainer.new()
+	bar.add_theme_constant_override("margin_left", SIDE_MARGIN)
+	bar.add_theme_constant_override("margin_right", SIDE_MARGIN)
+	bar.add_theme_constant_override("margin_top", 16)
+	bar.add_theme_constant_override("margin_bottom", 8)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	bar.add_child(row)
+	row.add_child(HexEmblem.new([], 68, 0.12))
 	var titles := VBoxContainer.new()
 	titles.alignment = BoxContainer.ALIGNMENT_CENTER
-	titles.add_theme_constant_override("separation", -6)
-	var title := _label("BGC", 92, BGCTheme.TEXT)
+	titles.add_theme_constant_override("separation", -8)
+	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title := _label("BGC", 46, BGCTheme.TEXT)
 	title.add_theme_font_override("font", BGCTheme.bold_font(1.1))
-	title.add_theme_color_override("font_outline_color", Color("0b1e33"))
-	title.add_theme_constant_override("outline_size", 14)
+	title.add_theme_color_override("font_outline_color", BGCTheme.BG_DEEP)
+	title.add_theme_constant_override("outline_size", 8)
 	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.45))
-	title.add_theme_constant_override("shadow_offset_y", 6)
+	title.add_theme_constant_override("shadow_offset_y", 3)
 	titles.add_child(title)
-	var subtitle := _label("BOARD GAME COLLECTION", 19, BGCTheme.ACCENT)
+	var subtitle := _label("BOARD GAME COLLECTION", 13, BGCTheme.ACCENT)
 	subtitle.add_theme_font_override("font", BGCTheme.bold_font(0.5))
 	titles.add_child(subtitle)
-	header.add_child(titles)
-	return header
+	row.add_child(titles)
+	_settings_button = _button("Ajustes", func() -> void:
+		Net.stop_discovery()
+		_show_page(_games_box if _is_shown(_settings_box) else _settings_box), "", 42)
+	var quit := _button("Salir", func() -> void: get_tree().quit(), "GhostButton", 42)
+	for b: Button in [_settings_button, quit]:
+		b.custom_minimum_size.x = 112
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(b)
+	return bar
 
 
-func _page() -> VBoxContainer:
+## Página de formulario: una columna dentro de un panel "de cristal".
+func _form_page() -> VBoxContainer:
+	var glass := PanelContainer.new()
+	glass.custom_minimum_size.x = FORM_WIDTH
+	glass.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	glass.visible = false
+	_pages.add_child(glass)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
-	box.visible = false
-	_pages.add_child(box)
+	glass.add_child(box)
 	return box
 
 
+## Nodo que se muestra u oculta para una página: la propia lista de juegos
+## o el panel que envuelve a un formulario.
+func _page_root(page: Control) -> Control:
+	return page if page == _games_box else page.get_parent()
+
+
+func _is_shown(page: Control) -> bool:
+	return _page_root(page).visible
+
+
 func _show_page(page: Control, animate: bool = true) -> void:
-	for p in [_games_box, _setup_box, _settings_box, _lobby_box]:
-		p.visible = p == page
+	for p: Control in [_games_box, _setup_box, _settings_box, _lobby_box]:
+		_page_root(p).visible = p == page
+	_scroll.scroll_vertical = 0
+	# En la sala de espera no se cambia de página sin salir de la partida.
+	_settings_button.visible = page != _lobby_box
+	_settings_button.text = "Juegos" if page == _settings_box else "Ajustes"
 	if animate:
-		page.modulate.a = 0.0
-		create_tween().tween_property(page, "modulate:a", 1.0, 0.25)
+		var shown := _page_root(page)
+		shown.modulate.a = 0.0
+		create_tween().tween_property(shown, "modulate:a", 1.0, 0.25)
 
 
 func _label(text: String, font_size: int = 17, color: Color = BGCTheme.TEXT) -> Label:
@@ -135,6 +211,18 @@ func _section(text: String) -> Label:
 	return label
 
 
+## Título de una página de formulario.
+func _page_title(text: String, colors: Array = []) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	if not colors.is_empty():
+		row.add_child(HexEmblem.new(colors, 44))
+	var title := _label(text, 28)
+	title.add_theme_font_override("font", BGCTheme.bold_font(0.8))
+	row.add_child(title)
+	return row
+
+
 ## Botón del tema con sonido de clic. `variation`: "", "PrimaryButton" o
 ## "GhostButton".
 func _button(text: String, callback: Callable, variation: String = "", min_height: float = 46.0) -> Button:
@@ -147,47 +235,123 @@ func _button(text: String, callback: Callable, variation: String = "", min_heigh
 	return button
 
 
-## Tarjeta de juego: ilustración, nombre, descripción y número de jugadores.
-## Se agranda un poco al pasar el ratón.
+## Tarjeta de juego: franja ilustrada con los colores del juego, nombre,
+## descripción y, abajo, las reglas y la partida guardada (si la hay).
+## Pulsar la tarjeta empieza una partida nueva. Se agranda un poco al pasar
+## el ratón o al recibir el foco del teclado.
 func _game_card(game: Dictionary) -> Button:
-	var card := _button("", _on_game_chosen.bind(game), "CardButton", 112)
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var row := HBoxContainer.new()
-	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	row.offset_left = 16
-	row.offset_right = -16
-	row.add_theme_constant_override("separation", 18)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(row)
-	var art := HexEmblem.new(game.get("colors", []), 84)
-	art.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(art)
+	var card := _button("", _on_game_chosen.bind(game), "CardButton", CARD_SIZE.y)
+	card.custom_minimum_size.x = CARD_SIZE.x
+	card.pivot_offset = CARD_SIZE / 2.0
+	var colors: Array = game.get("colors", BGCTheme.PALETTE)
+
+	var banner := CardBanner.new(colors)
+	banner.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	banner.offset_left = 3
+	banner.offset_top = 3
+	banner.offset_right = -3
+	banner.offset_bottom = BANNER_HEIGHT
+	card.add_child(banner)
+	var art := HexEmblem.new(colors, 70)
+	art.position = Vector2(18, (BANNER_HEIGHT - 70) / 2.0)
+	art.size = Vector2(70, 70)
+	banner.add_child(art)
+	var chip := _chip("%d–%d jugadores" % [game["min_players"], game["max_players"]])
+	banner.add_child(chip)
+	chip.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 10)
+
 	var texts := VBoxContainer.new()
-	texts.alignment = BoxContainer.ALIGNMENT_CENTER
-	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	texts.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	texts.offset_left = 18
+	texts.offset_right = -18
+	texts.offset_top = BANNER_HEIGHT + 8
+	texts.offset_bottom = -14
+	texts.add_theme_constant_override("separation", 2)
 	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var name_label := _label(game["name"], 26)
+	card.add_child(texts)
+	var name_label := _label(game["name"], 24)
 	name_label.add_theme_font_override("font", BGCTheme.bold_font(0.8))
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(name_label)
-	var desc := _label(game["description"], 14, BGCTheme.TEXT_DIM)
+	var desc := _label(game["description"], 13, BGCTheme.TEXT_DIM)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	desc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(desc)
-	var players := _label("%d–%d jugadores  ·  humanos e IA" % [game["min_players"], game["max_players"]], 13, BGCTheme.ACCENT)
-	texts.add_child(players)
-	for child in texts.get_children():
-		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(texts)
-	var arrow := _label("›", 40, BGCTheme.ACCENT)
-	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(arrow)
-	card.resized.connect(func() -> void: card.pivot_offset = card.size / 2.0)
-	card.mouse_entered.connect(func() -> void:
-		create_tween().tween_property(card, "scale", Vector2.ONE * 1.025, 0.12)
-		create_tween().tween_property(art, "spin_speed", 0.6, 0.2))
-	card.mouse_exited.connect(func() -> void:
-		create_tween().tween_property(card, "scale", Vector2.ONE, 0.12)
-		create_tween().tween_property(art, "spin_speed", 0.0, 0.4))
+
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texts.add_child(actions)
+	if game.has("rules"):
+		var rules := _button("Reglas", func() -> void: RulesPanel.open(self, game["rules"]), "GhostButton", 34)
+		rules.tooltip_text = "Reglas de %s" % game["name"]
+		actions.add_child(rules)
+	if App.has_save(game["id"]):
+		var resume := _button("▶  Continuar", App.continue_game.bind(game["id"]), "PrimaryButton", 34)
+		resume.tooltip_text = "Continuar la partida guardada de %s" % game["name"]
+		actions.add_child(resume)
+	for b: Button in actions.get_children():
+		b.add_theme_font_size_override("font_size", 14)
+		b.add_theme_stylebox_override("focus", BGCTheme.box(Color.TRANSPARENT, BGCTheme.ACCENT, 10, 2, 0, 6))
+	var play := _label("Nueva partida  ›" if App.has_save(game["id"]) else "Jugar  ›", 15, BGCTheme.ACCENT)
+	play.add_theme_font_override("font", BGCTheme.bold_font(0.5))
+	play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	play.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	play.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	actions.add_child(play)
+
+	var highlight := func(on: bool) -> void:
+		card.z_index = 1 if on else 0
+		create_tween().tween_property(card, "scale", Vector2.ONE * (1.03 if on else 1.0), 0.12)
+		create_tween().tween_property(art, "spin_speed", 0.6 if on else 0.0, 0.2 if on else 0.4)
+	card.mouse_entered.connect(highlight.bind(true))
+	card.mouse_exited.connect(func() -> void: highlight.call(card.has_focus()))
+	card.focus_entered.connect(highlight.bind(true))
+	card.focus_exited.connect(highlight.bind(false))
 	return card
+
+
+## Etiqueta pequeña con fondo oscuro (para la franja de las tarjetas).
+func _chip(text: String) -> Control:
+	var chip := PanelContainer.new()
+	chip.add_theme_stylebox_override("panel", BGCTheme.box(Color(0.03, 0.08, 0.14, 0.72), Color(1, 1, 1, 0.16), 11, 1, 0, 3))
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var label := _label(text, 12, BGCTheme.TEXT)
+	label.add_theme_font_override("font", BGCTheme.bold_font(0.4))
+	chip.add_child(label)
+	return chip
+
+
+## Franja superior de una tarjeta: fondo con los colores del juego y
+## hexágonos tenues de adorno.
+class CardBanner extends Control:
+	var _colors: Array
+
+	func _init(colors: Array) -> void:
+		_colors = colors
+		clip_contents = true
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var base: Color = _colors[_colors.size() - 1]
+		var style := StyleBoxFlat.new()
+		style.bg_color = base.darkened(0.45)
+		style.corner_radius_top_left = 13
+		style.corner_radius_top_right = 13
+		draw_style_box(style, Rect2(Vector2.ZERO, size))
+		# Hexágonos de adorno, siempre en el mismo sitio para cada tarjeta.
+		var spots := [[0.42, 0.75, 34.0], [0.58, 0.1, 22.0], [0.74, 0.8, 46.0], [0.95, 0.55, 30.0], [0.3, 0.05, 16.0]]
+		for i in spots.size():
+			var c: Color = _colors[i % _colors.size()]
+			var center := Vector2(spots[i][0] * size.x, spots[i][1] * size.y)
+			var points := PackedVector2Array()
+			for k in 6:
+				points.append(center + Vector2.from_angle(0.4 * i + k * TAU / 6.0) * spots[i][2])
+			draw_colored_polygon(points, Color(c, 0.3))
+			points.append(points[0])
+			draw_polyline(points, Color(c.lightened(0.35), 0.45), 1.5, true)
+		draw_line(Vector2(0, size.y - 1), Vector2(size.x, size.y - 1), Color(1, 1, 1, 0.14), 2.0)
 
 
 # --- Página de juegos ------------------------------------------------------------------
@@ -196,33 +360,56 @@ func _game_card(game: Dictionary) -> Button:
 func _show_notice(text: String) -> void:
 	var old := _games_box.get_node_or_null("Notice")
 	if old != null:
+		_games_box.remove_child(old)
 		old.queue_free()
-	var notice := _label("⚠  " + text, 15, BGCTheme.ACCENT)
+	var notice := PanelContainer.new()
 	notice.name = "Notice"
-	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	notice.add_theme_stylebox_override("panel", BGCTheme.box(Color(BGCTheme.ACCENT_DARK, 0.16), Color(BGCTheme.ACCENT, 0.6), 12, 1, 0, 10))
+	var label := _label("⚠  " + text, 15, BGCTheme.ACCENT)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	notice.add_child(label)
 	_games_box.add_child(notice)
 	_games_box.move_child(notice, 0)
 
 
 func _build_game_list() -> void:
-	_games_box.add_child(_section("Elige un juego"))
-	for game in GameRegistry.all_games():
-		if App.has_save(game["id"]):
-			_games_box.add_child(_button("▶  Continuar partida de %s" % game["name"], App.continue_game.bind(game["id"]), "PrimaryButton", 50))
-		_games_box.add_child(_game_card(game))
-		if game.has("rules"):
-			var rules := _button("Reglas de %s" % game["name"], func() -> void: RulesPanel.open(self, game["rules"]), "GhostButton", 36)
-			_games_box.add_child(rules)
-	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 10)
-	var settings := _button("Ajustes", func() -> void: _show_page(_settings_box))
-	settings.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bottom.add_child(settings)
-	var quit := _button("Salir", func() -> void: get_tree().quit(), "GhostButton")
-	quit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bottom.add_child(quit)
-	_games_box.add_child(HSeparator.new())
-	_games_box.add_child(bottom)
+	var games := GameRegistry.all_games()
+	var heading := HBoxContainer.new()
+	var section := _section("Elige un juego")
+	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(section)
+	heading.add_child(_label("%d juegos · humanos e IA" % games.size(), 13, BGCTheme.TEXT_DIM))
+	_games_box.add_child(heading)
+	_cards_box = VBoxContainer.new()
+	_cards_box.add_theme_constant_override("separation", CARD_GAP)
+	_games_box.add_child(_cards_box)
+	for game in games:
+		_cards.append(_game_card(game))
+
+
+## Reparte las tarjetas en filas según el ancho de la ventana (de 1 a
+## MAX_COLUMNS columnas); la última fila queda centrada.
+func _layout_cards() -> void:
+	var available := size.x - 2.0 * SIDE_MARGIN
+	var columns := clampi(int((available + CARD_GAP) / (CARD_SIZE.x + CARD_GAP)), 1, MAX_COLUMNS)
+	if columns == _columns:
+		return
+	_columns = columns
+	for card in _cards:
+		if card.get_parent() != null:
+			card.get_parent().remove_child(card)
+	for row in _cards_box.get_children():
+		_cards_box.remove_child(row)
+		row.queue_free()
+	var row: HBoxContainer
+	for i in _cards.size():
+		if i % columns == 0:
+			row = HBoxContainer.new()
+			row.alignment = BoxContainer.ALIGNMENT_CENTER
+			row.add_theme_constant_override("separation", CARD_GAP)
+			_cards_box.add_child(row)
+		row.add_child(_cards[i])
+	_games_box.custom_minimum_size.x = columns * CARD_SIZE.x + (columns - 1) * CARD_GAP
 
 
 # --- Página de jugadores ---------------------------------------------------------------
@@ -233,9 +420,7 @@ func _on_game_chosen(game: Dictionary) -> void:
 		_setup_box.remove_child(child)
 		child.queue_free()
 
-	var title := _label(game["name"], 28)
-	title.add_theme_font_override("font", BGCTheme.bold_font(0.8))
-	_setup_box.add_child(title)
+	_setup_box.add_child(_page_title(game["name"], game.get("colors", BGCTheme.PALETTE)))
 
 	var modes := HBoxContainer.new()
 	modes.add_theme_constant_override("separation", 8)
@@ -315,13 +500,17 @@ func _build_game_options(game: Dictionary) -> void:
 	if options.is_empty():
 		return
 	_setup_box.add_child(_section("Opciones"))
+	var checks := VBoxContainer.new()
+	checks.add_theme_constant_override("separation", 0)
+	_setup_box.add_child(checks)
 	var current := App.game_options(game["id"])
 	for option in options:
 		var check := CheckBox.new()
 		check.text = option["label"]
 		check.button_pressed = current.get(option["key"], option["default"])
 		check.toggled.connect(func(on: bool) -> void: App.set_game_option(game["id"], option["key"], on))
-		_setup_box.add_child(check)
+		check.pressed.connect(func() -> void: Sfx.play(&"click"))
+		checks.add_child(check)
 
 
 func _set_player_count(n: int) -> void:
@@ -334,7 +523,7 @@ func _rebuild_player_rows() -> void:
 	while _name_edits.size() < _player_count:
 		var i := _name_edits.size()
 		var row_panel := PanelContainer.new()
-		var style := BGCTheme.box(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.08), 12, 1, 0, 6)
+		var style := BGCTheme.box(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.08), 12, 1, 0, 4)
 		row_panel.add_theme_stylebox_override("panel", style)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
@@ -369,7 +558,7 @@ func _rebuild_player_rows() -> void:
 		var row := _players_list.get_child(_players_list.get_child_count() - 1)
 		_players_list.remove_child(row)
 		row.queue_free()
-	_players_scroll.custom_minimum_size.y = minf(_player_count, MAX_VISIBLE_ROWS) * PLAYER_ROW_HEIGHT
+	_players_scroll.custom_minimum_size.y = minf(_player_count, MAX_VISIBLE_ROWS) * PLAYER_ROW_HEIGHT - 8.0
 
 
 func _on_play() -> void:
@@ -487,9 +676,7 @@ func _on_lobby_changed() -> void:
 	for child in _lobby_box.get_children():
 		_lobby_box.remove_child(child)
 		child.queue_free()
-	var title := _label("Sala de espera", 28)
-	title.add_theme_font_override("font", BGCTheme.bold_font(0.8))
-	_lobby_box.add_child(title)
+	_lobby_box.add_child(_page_title("Sala de espera"))
 	if Net.is_host:
 		var ips := Net.local_addresses()
 		var where := ", ".join(ips) if not ips.is_empty() else "desconocida"
@@ -564,7 +751,7 @@ func _on_lobby_changed() -> void:
 		waiting.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		buttons.add_child(waiting)
 	_lobby_box.add_child(buttons)
-	if not _lobby_box.visible:
+	if not _is_shown(_lobby_box):
 		_show_page(_lobby_box)
 
 
@@ -572,9 +759,7 @@ func _on_lobby_changed() -> void:
 
 ## Ajustes que se guardan entre sesiones.
 func _build_settings() -> void:
-	var title := _label("Ajustes", 28)
-	title.add_theme_font_override("font", BGCTheme.bold_font(0.8))
-	_settings_box.add_child(title)
+	_settings_box.add_child(_page_title("Ajustes"))
 
 	var volume_row := HBoxContainer.new()
 	var volume_label := _label("Volumen")
