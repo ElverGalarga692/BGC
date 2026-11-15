@@ -81,15 +81,19 @@ static func bold_font(strength: float = 0.7) -> FontVariation:
 	return f
 
 
-static func build() -> Theme:
+## `button`, `border` y `field` cambian el tono de botones y campos para
+## los juegos con otra paleta (p. ej. los marrones de Pests!).
+static func build(button: Color = BUTTON, border: Color = BORDER, field: Color = Color("10263d")) -> Theme:
+	var button_hover := button.lightened(0.12)
+	var button_pressed := button.darkened(0.2)
 	var t := Theme.new()
 	t.default_font_size = 17
 
 	# Botones normales.
-	t.set_stylebox("normal", "Button", box(BUTTON, BORDER, 12, 2, 5))
-	t.set_stylebox("hover", "Button", box(BUTTON_HOVER, ACCENT, 12, 2, 7))
-	t.set_stylebox("pressed", "Button", box(BUTTON_PRESSED, ACCENT_DARK, 12, 2, 2))
-	t.set_stylebox("disabled", "Button", box(Color(BUTTON, 0.5), Color(BORDER, 0.4), 12, 2, 0))
+	t.set_stylebox("normal", "Button", box(button, border, 12, 2, 5))
+	t.set_stylebox("hover", "Button", box(button_hover, ACCENT, 12, 2, 7))
+	t.set_stylebox("pressed", "Button", box(button_pressed, ACCENT_DARK, 12, 2, 2))
+	t.set_stylebox("disabled", "Button", box(Color(button, 0.5), Color(border, 0.4), 12, 2, 0))
 	t.set_stylebox("focus", "Button", box(Color.TRANSPARENT, ACCENT, 12, 2, 0))
 	t.set_color("font_color", "Button", TEXT)
 	t.set_color("font_hover_color", "Button", Color.WHITE)
@@ -115,7 +119,7 @@ static func build() -> Theme:
 
 	# Tarjetas de juego (variación "CardButton").
 	t.set_type_variation("CardButton", "Button")
-	t.set_stylebox("normal", "CardButton", box(Color("1b3d5e"), BORDER, 16, 2, 8, 14))
+	t.set_stylebox("normal", "CardButton", box(Color("1b3d5e"), border, 16, 2, 8, 14))
 	t.set_stylebox("hover", "CardButton", box(Color("23507a"), ACCENT, 16, 3, 12, 14))
 	t.set_stylebox("pressed", "CardButton", box(Color("163250"), ACCENT_DARK, 16, 3, 3, 14))
 	t.set_stylebox("focus", "CardButton", box(Color.TRANSPARENT, ACCENT, 16, 2, 0, 14))
@@ -124,17 +128,17 @@ static func build() -> Theme:
 	t.set_stylebox("panel", "PanelContainer", box(Color(0.04, 0.1, 0.18, 0.72), Color(1, 1, 1, 0.1), 20, 1, 18, 22))
 
 	# Campos de texto, selectores y casillas.
-	t.set_stylebox("normal", "LineEdit", box(Color("10263d"), BORDER, 10, 1, 0, 8))
-	t.set_stylebox("focus", "LineEdit", box(Color("10263d"), ACCENT, 10, 2, 0, 8))
+	t.set_stylebox("normal", "LineEdit", box(field, border, 10, 1, 0, 8))
+	t.set_stylebox("focus", "LineEdit", box(field, ACCENT, 10, 2, 0, 8))
 	t.set_color("font_placeholder_color", "LineEdit", Color(TEXT_DIM, 0.6))
-	t.set_stylebox("normal", "OptionButton", box(BUTTON, BORDER, 10, 1, 3, 8))
-	t.set_stylebox("hover", "OptionButton", box(BUTTON_HOVER, ACCENT, 10, 1, 4, 8))
-	t.set_stylebox("pressed", "OptionButton", box(BUTTON_PRESSED, ACCENT_DARK, 10, 1, 1, 8))
+	t.set_stylebox("normal", "OptionButton", box(button, border, 10, 1, 3, 8))
+	t.set_stylebox("hover", "OptionButton", box(button_hover, ACCENT, 10, 1, 4, 8))
+	t.set_stylebox("pressed", "OptionButton", box(button_pressed, ACCENT_DARK, 10, 1, 1, 8))
 	t.set_stylebox("focus", "OptionButton", box(Color.TRANSPARENT, ACCENT, 10, 1, 0, 8))
-	t.set_stylebox("panel", "PopupMenu", box(Color("10263d"), BORDER, 10, 1, 8, 6))
-	t.set_stylebox("hover", "PopupMenu", box(BUTTON_HOVER, Color.TRANSPARENT, 6, 0, 0, 4))
-	t.set_stylebox("normal", "ColorPickerButton", box(BUTTON, BORDER, 10, 1, 3, 6))
-	t.set_stylebox("hover", "ColorPickerButton", box(BUTTON_HOVER, ACCENT, 10, 1, 4, 6))
+	t.set_stylebox("panel", "PopupMenu", box(field, border, 10, 1, 8, 6))
+	t.set_stylebox("hover", "PopupMenu", box(button_hover, Color.TRANSPARENT, 6, 0, 0, 4))
+	t.set_stylebox("normal", "ColorPickerButton", box(button, border, 10, 1, 3, 6))
+	t.set_stylebox("hover", "ColorPickerButton", box(button_hover, ACCENT, 10, 1, 4, 6))
 	t.set_color("font_color", "Label", TEXT)
 	t.set_color("font_color", "CheckButton", TEXT)
 	t.set_color("font_hover_color", "CheckButton", Color.WHITE)
@@ -162,11 +166,11 @@ static func build() -> Theme:
 	for bar in ["VScrollBar", "HScrollBar"]:
 		t.set_stylebox("scroll", bar, _bar(Color(1, 1, 1, 0.05)))
 		t.set_stylebox("scroll_focus", bar, _bar(Color(1, 1, 1, 0.05)))
-		t.set_stylebox("grabber", bar, _bar(Color(BORDER, 0.8)))
+		t.set_stylebox("grabber", bar, _bar(Color(border, 0.8)))
 		t.set_stylebox("grabber_highlight", bar, _bar(ACCENT_DARK))
 		t.set_stylebox("grabber_pressed", bar, _bar(ACCENT))
 
-	t.set_stylebox("slider", "HSlider", box(Color("10263d"), BORDER, 6, 1, 0, 3))
+	t.set_stylebox("slider", "HSlider", box(field, border, 6, 1, 0, 3))
 	t.set_stylebox("grabber_area", "HSlider", box(ACCENT_DARK, Color.TRANSPARENT, 6, 0, 0, 3))
 	t.set_stylebox("grabber_area_highlight", "HSlider", box(ACCENT, Color.TRANSPARENT, 6, 0, 0, 3))
 	return t

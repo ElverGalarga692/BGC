@@ -9,7 +9,9 @@ const G := preload("res://games/pests/logic/pests_game.gd")
 const D := preload("res://games/pests/logic/pests_defs.gd")
 
 const GAME_ID := "pests"
-const BACKGROUND := Color("2b2320")
+const BACKGROUND := Color("1c1613")
+const PANEL_FILL := Color(0.13, 0.1, 0.085, 0.92)
+const DIALOG_FILL := Color("2b211c")
 const LEFT_WIDTH := 290.0
 const RIGHT_WIDTH := 320.0
 const MARGIN := 12.0
@@ -61,6 +63,7 @@ var _dialog_key := ""
 
 
 func _ready() -> void:
+	theme = BGCTheme.build(Color("4a392e"), Color("7d6552"), Color("241b17"))
 	var bg := ColorRect.new()
 	bg.color = BACKGROUND
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -150,18 +153,27 @@ func _local_actor() -> int:
 
 # --- Construcción de la interfaz -------------------------------------------
 
-func _panel(width: float) -> VBoxContainer:
+## Panel lateral anclado a un borde de la pantalla (ocupa todo el alto).
+func _panel(width: float, on_right: bool) -> VBoxContainer:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(width, 0)
+	panel.add_theme_stylebox_override("panel", BGCTheme.box(PANEL_FILL, Color(1, 1, 1, 0.1), 16, 1, 8, 12))
 	add_child(panel)
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 12)
-	panel.add_child(margin)
+	panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE if on_right else Control.PRESET_LEFT_WIDE)
+	panel.offset_top = MARGIN
+	panel.offset_bottom = -MARGIN
+	panel.offset_left = -MARGIN - width if on_right else MARGIN
+	panel.offset_right = -MARGIN if on_right else MARGIN + width
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 7)
-	margin.add_child(box)
+	box.add_theme_constant_override("separation", 6)
+	panel.add_child(box)
 	return box
+
+
+## Título de sección dentro de un panel.
+func _section(text: String) -> Label:
+	var label := _label(text, 13)
+	label.add_theme_color_override("font_color", BGCTheme.TEXT_DIM)
+	return label
 
 
 func _label(text: String = "", font_size: int = 16) -> Label:
@@ -172,19 +184,25 @@ func _label(text: String = "", font_size: int = 16) -> Label:
 	return label
 
 
-func _button(text: String, callback: Callable, font_size: int = 15) -> Button:
+func _button(text: String, callback: Callable, font_size: int = 15, variation: String = "") -> Button:
 	var button := Button.new()
 	button.text = text
+	button.theme_type_variation = variation
 	button.add_theme_font_size_override("font_size", font_size)
 	button.pressed.connect(callback)
 	return button
 
 
 func _build_left_panel() -> void:
-	var box := _panel(LEFT_WIDTH)
-	box.add_child(_label("Pests!", 24))
+	var box := _panel(LEFT_WIDTH, false)
+	var title := _label("Pests!", 26)
+	title.add_theme_color_override("font_color", BGCTheme.ACCENT)
+	title.add_theme_font_override("font", BGCTheme.bold_font(0.8))
+	box.add_child(title)
 	var players_scroll := ScrollContainer.new()
-	players_scroll.custom_minimum_size = Vector2(0, 250)
+	players_scroll.custom_minimum_size = Vector2(0, 180)
+	players_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	players_scroll.size_flags_stretch_ratio = 1.4
 	players_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(players_scroll)
 	_players_box = VBoxContainer.new()
@@ -192,7 +210,7 @@ func _build_left_panel() -> void:
 	_players_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	players_scroll.add_child(_players_box)
 	box.add_child(HSeparator.new())
-	box.add_child(_label("Registro", 14))
+	box.add_child(_section("Registro"))
 	_log_label = RichTextLabel.new()
 	_log_label.bbcode_enabled = true
 	_log_label.scroll_following = true
@@ -204,18 +222,26 @@ func _build_left_panel() -> void:
 	_hover_label.modulate = DIM
 	_hover_label.custom_minimum_size = Vector2(0, 52)
 	box.add_child(_hover_label)
-	box.add_child(_button("Reglas", func() -> void: RulesPanel.open(self, GameRegistry.find(GAME_ID)["rules"])))
+	var row := HBoxContainer.new()
+	var rules := _button("Reglas", func() -> void: RulesPanel.open(self, GameRegistry.find(GAME_ID)["rules"]), 14, "GhostButton")
+	rules.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(rules)
+	var menu := _button("Menú", App.go_to_menu, 14, "GhostButton")
+	menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(menu)
+	box.add_child(row)
 	_ai_fast_toggle = CheckButton.new()
 	_ai_fast_toggle.text = "IA rápida"
+	_ai_fast_toggle.add_theme_font_size_override("font_size", 14)
 	_ai_fast_toggle.button_pressed = App.get_setting("ai_fast", false)
 	_ai_fast_toggle.toggled.connect(func(on: bool) -> void: App.set_setting("ai_fast", on))
 	box.add_child(_ai_fast_toggle)
-	box.add_child(_button("Volver al menú", App.go_to_menu))
 
 
 func _build_right_panel() -> void:
-	var box := _panel(RIGHT_WIDTH)
+	var box := _panel(RIGHT_WIDTH, true)
 	_turn_label = _label("", 22)
+	_turn_label.add_theme_font_override("font", BGCTheme.bold_font(0.6))
 	_turn_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_turn_label.clip_text = true
 	box.add_child(_turn_label)
@@ -258,13 +284,13 @@ func _build_right_panel() -> void:
 	_actions_box.add_theme_constant_override("separation", 5)
 	inner.add_child(_actions_box)
 	inner.add_child(HSeparator.new())
-	_hand_label = _label("", 13)
+	_hand_label = _section("")
 	inner.add_child(_hand_label)
 	_hand_box = VBoxContainer.new()
 	_hand_box.add_theme_constant_override("separation", 4)
 	inner.add_child(_hand_box)
-	_end_button = _button("Terminar turno", func() -> void: _submit(G.END_TURN), 16)
-	_end_button.custom_minimum_size = Vector2(0, 40)
+	_end_button = _button("Terminar turno", func() -> void: _submit(G.END_TURN), 16, "PrimaryButton")
+	_end_button.custom_minimum_size = Vector2(0, 46)
 	box.add_child(_end_button)
 
 
@@ -275,6 +301,12 @@ func _action_button(text: String, callback: Callable, enabled: bool, tooltip: St
 	b.tooltip_text = tooltip
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.clip_text = true
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var style: StyleBoxFlat = get_theme_stylebox(state, "Button").duplicate()
+		style.content_margin_top = 6
+		style.content_margin_bottom = 6
+		style.shadow_size = 0
+		b.add_theme_stylebox_override(state, style)
 	_actions_box.add_child(b)
 	return b
 
@@ -291,22 +323,11 @@ func _build_overlays() -> void:
 	_victory = PanelContainer.new()
 	_victory.custom_minimum_size = Vector2(420, 0)
 	_victory.visible = false
-	var victory_style := StyleBoxFlat.new()
-	victory_style.bg_color = Color("241c18")
-	victory_style.border_color = HIGHLIGHT
-	victory_style.set_border_width_all(3)
-	victory_style.set_corner_radius_all(14)
-	victory_style.shadow_size = 18
-	victory_style.shadow_color = Color(0, 0, 0, 0.6)
-	_victory.add_theme_stylebox_override("panel", victory_style)
+	_victory.add_theme_stylebox_override("panel", BGCTheme.box(DIALOG_FILL, HIGHLIGHT, 18, 2, 18, 26))
 	add_child(_victory)
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 28)
-	_victory.add_child(margin)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
-	margin.add_child(box)
+	_victory.add_child(box)
 	var title := _label("", 34)
 	title.name = "Title"
 	title.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -317,10 +338,10 @@ func _build_overlays() -> void:
 	details.custom_minimum_size = Vector2(360, 0)
 	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(details)
-	var again := _button("Nueva partida (mismos jugadores)", func() -> void: _start(BGCRng.random_seed()))
+	var again := _button("Nueva partida (mismos jugadores)", func() -> void: _start(BGCRng.random_seed()), 15, "PrimaryButton")
 	again.name = "Again"
 	box.add_child(again)
-	box.add_child(_button("Volver al menú", App.go_to_menu))
+	box.add_child(_button("Volver al menú", App.go_to_menu, 15, "GhostButton"))
 
 
 func _board_rect() -> Rect2:
@@ -329,12 +350,6 @@ func _board_rect() -> Rect2:
 
 
 func _layout() -> void:
-	var left: Control = _players_box.get_parent().get_parent().get_parent().get_parent()
-	var right: Control = _turn_label.get_parent().get_parent().get_parent()
-	left.position = Vector2(MARGIN, MARGIN)
-	left.size = Vector2(LEFT_WIDTH, size.y - MARGIN * 2)
-	right.position = Vector2(size.x - RIGHT_WIDTH - MARGIN, MARGIN)
-	right.size = Vector2(RIGHT_WIDTH, size.y - MARGIN * 2)
 	var rect := _board_rect()
 	_board.fit(rect)
 	_banner.position = rect.position
@@ -392,14 +407,15 @@ func _refresh_players() -> void:
 		style.bg_color = Color(1, 1, 1, 0.07 if pid == game.turns.current else 0.03)
 		style.border_color = HIGHLIGHT if pid == game.turns.current and not game.finished else Color(1, 1, 1, 0.1)
 		style.set_border_width_all(2 if pid == game.turns.current else 1)
-		style.set_corner_radius_all(8)
-		style.set_content_margin_all(6)
+		style.set_corner_radius_all(10)
+		style.set_content_margin_all(7)
 		panel.add_theme_stylebox_override("panel", style)
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 1)
 		panel.add_child(box)
 		var name := _label(p.display_name + (" (IA)" if p.is_ai else "") + ((" · Equipo %s" % ["A", "B"][game.team_of[pid]]) if game.teams_enabled() and game.species(pid) < 0 else ""), 15)
 		name.add_theme_color_override("font_color", _color(pid))
+		name.add_theme_font_override("font", BGCTheme.bold_font(0.4))
 		box.add_child(name)
 		var sp := game.species(pid)
 		if sp >= 0:
@@ -680,15 +696,14 @@ func _open_dialog(key: String, title: String) -> VBoxContainer:
 	shade.add_child(center)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(minf(440, rect.size.x - 20), 0)
+	panel.add_theme_stylebox_override("panel", BGCTheme.box(DIALOG_FILL, Color(1, 1, 1, 0.15), 18, 1, 18, 18))
 	center.add_child(panel)
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 18)
-	panel.add_child(margin)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
-	margin.add_child(box)
-	box.add_child(_label(title, 20))
+	panel.add_child(box)
+	var title_label := _label(title, 20)
+	title_label.add_theme_font_override("font", BGCTheme.bold_font(0.6))
+	box.add_child(title_label)
 	return box
 
 
