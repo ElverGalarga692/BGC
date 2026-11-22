@@ -26,11 +26,11 @@ const RIGHT_WIDTH := 320.0
 const AI_DELAY := 0.7
 const AI_DELAY_FAST := 0.15
 const ERROR_COLOR := Color("ff8a80")
-const DOCK_WIDTH := 460.0
+const DOCK_WIDTH := 540.0
 const HAND_CARD := Vector2(74, 104)
 const DOCK_CARD := Vector2(62, 87)
 ## Nombres cortos para las fichas del consejo.
-const OFFICE_SHORT := ["Capitana", "Contraband.", "Recaudad.", "Urbanista", "Obras", "Mecenas", "Alcaldesa"]
+const OFFICE_SHORT := ["Capitana", "Contrab.", "Recaud.", "Urbanista", "Obras", "Mecenas", "Alcaldesa"]
 const OK_COLOR := Color("8fd694")
 
 var game: PuertoGame
@@ -507,8 +507,11 @@ func _refresh_council(pub: Dictionary) -> void:
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.custom_minimum_size = Vector2(60, 0)
 		var fill := Color(color, 0.22) if holder >= 0 else Color(0, 0, 0, 0.25)
-		panel.add_theme_stylebox_override("panel", BGCTheme.box(fill, Color("ffd166") if current else Color(color, 0.6), 10, 3 if current else 1, 0, 6))
-		panel.tooltip_text = D.OFFICE_TEXT[o]
+		var tab_style := BGCTheme.box(fill, Color("ffd166") if current else Color(color, 0.6), 10, 3 if current else 1, 0, 6)
+		tab_style.content_margin_left = 4
+		tab_style.content_margin_right = 4
+		panel.add_theme_stylebox_override("panel", tab_style)
+		panel.tooltip_text = "%s: %s" % [D.OFFICE_NAMES[o], D.OFFICE_TEXT[o]]
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 0)
 		panel.add_child(col)
@@ -894,7 +897,14 @@ func _fill_pick(seat: int) -> void:
 		var b := _button("%d. %s%s" % [o + 1, D.OFFICE_NAMES[o], extra], func() -> void:
 			_pick_office = o
 			_render_overlay(), 13, "PrimaryButton" if _pick_office == o else "")
-		b.custom_minimum_size = Vector2(150, 0)
+		b.custom_minimum_size = Vector2(190, 38)
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		for state in ["normal", "hover", "pressed", "focus"]:
+			var style: StyleBoxFlat = get_theme_stylebox(state, b.theme_type_variation if b.theme_type_variation != "" else "Button").duplicate()
+			style.content_margin_top = 5
+			style.content_margin_bottom = 5
+			style.shadow_size = 0
+			b.add_theme_stylebox_override(state, style)
 		row.add_child(b)
 		var text := _label(D.OFFICE_TEXT[o], 12, BGCTheme.TEXT if _pick_office == o else BGCTheme.TEXT_DIM)
 		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL

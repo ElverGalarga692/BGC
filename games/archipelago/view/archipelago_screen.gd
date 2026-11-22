@@ -17,6 +17,8 @@ const RIGHT_WIDTH := 300.0
 const MARGIN := 12.0
 const RESOURCE_COLORS := ArchBoardView.RESOURCE_COLORS
 const HIGHLIGHT := Color("ffd166")
+const PANEL_FILL := Color(0.04, 0.1, 0.16, 0.9)
+const DIALOG_FILL := Color("102a44")
 ## Pausa entre jugadas de la IA (normal / rápida), en segundos.
 const AI_DELAY := 0.6
 const AI_DELAY_FAST := 0.12
@@ -76,6 +78,7 @@ var _dialog_key := ""
 
 
 func _ready() -> void:
+	theme = BGCTheme.build()
 	var bg := ColorRect.new()
 	bg.color = BACKGROUND
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -168,18 +171,27 @@ func _local_actor() -> int:
 
 # --- Construcción de la interfaz -------------------------------------------
 
-func _panel(width: float) -> VBoxContainer:
+## Panel lateral anclado a un borde de la pantalla (ocupa todo el alto).
+func _panel(width: float, on_right: bool) -> VBoxContainer:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(width, 0)
+	panel.add_theme_stylebox_override("panel", BGCTheme.box(PANEL_FILL, Color(1, 1, 1, 0.1), 16, 1, 8, 12))
 	add_child(panel)
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 12)
-	panel.add_child(margin)
+	panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE if on_right else Control.PRESET_LEFT_WIDE)
+	panel.offset_top = MARGIN
+	panel.offset_bottom = -MARGIN
+	panel.offset_left = -MARGIN - width if on_right else MARGIN
+	panel.offset_right = -MARGIN if on_right else MARGIN + width
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 7)
-	margin.add_child(box)
+	box.add_theme_constant_override("separation", 6)
+	panel.add_child(box)
 	return box
+
+
+## Título de sección dentro de un panel.
+func _section(text: String) -> Label:
+	var label := _label(text, 13)
+	label.add_theme_color_override("font_color", BGCTheme.TEXT_DIM)
+	return label
 
 
 func _label(text: String = "", font_size: int = 16) -> Label:
@@ -190,22 +202,26 @@ func _label(text: String = "", font_size: int = 16) -> Label:
 	return label
 
 
-func _button(text: String, callback: Callable, font_size: int = 15) -> Button:
+func _button(text: String, callback: Callable, font_size: int = 15, variation: String = "") -> Button:
 	var button := Button.new()
 	button.text = text
+	button.theme_type_variation = variation
 	button.add_theme_font_size_override("font_size", font_size)
 	button.pressed.connect(callback)
 	return button
 
 
 func _build_left_panel() -> void:
-	var box := _panel(LEFT_WIDTH)
-	box.add_child(_label("Archipiélago", 24))
+	var box := _panel(LEFT_WIDTH, false)
+	var title := _label("Archipiélago", 26)
+	title.add_theme_color_override("font_color", BGCTheme.ACCENT)
+	title.add_theme_font_override("font", BGCTheme.bold_font(0.8))
+	box.add_child(title)
 	_players_box = VBoxContainer.new()
 	_players_box.add_theme_constant_override("separation", 6)
 	box.add_child(_players_box)
 	box.add_child(HSeparator.new())
-	box.add_child(_label("Registro", 14))
+	box.add_child(_section("Registro"))
 	_log_label = RichTextLabel.new()
 	_log_label.bbcode_enabled = true
 	_log_label.scroll_following = true
@@ -217,21 +233,29 @@ func _build_left_panel() -> void:
 	_hover_label.modulate = Color(1, 1, 1, 0.7)
 	_hover_label.custom_minimum_size = Vector2(0, 36)
 	box.add_child(_hover_label)
-	box.add_child(_button("Reglas", func() -> void: RulesPanel.open(self, GameRegistry.find("archipelago")["rules"])))
-	_view_button = _button("", func() -> void: _set_view_3d(not _is_3d))
+	_view_button = _button("", func() -> void: _set_view_3d(not _is_3d), 14, "GhostButton")
 	box.add_child(_view_button)
+	var row := HBoxContainer.new()
+	var rules := _button("Reglas", func() -> void: RulesPanel.open(self, GameRegistry.find("archipelago")["rules"]), 14, "GhostButton")
+	rules.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(rules)
+	var menu := _button("Menú", App.go_to_menu, 14, "GhostButton")
+	menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(menu)
+	box.add_child(row)
 	_ai_fast_toggle = CheckButton.new()
 	_ai_fast_toggle.text = "IA rápida"
+	_ai_fast_toggle.add_theme_font_size_override("font_size", 14)
 	_ai_fast_toggle.button_pressed = App.get_setting("ai_fast", false)
 	_ai_fast_toggle.toggled.connect(func(on: bool) -> void: App.set_setting("ai_fast", on))
 	box.add_child(_ai_fast_toggle)
-	box.add_child(_button("Volver al menú", App.go_to_menu))
 
 
 func _build_right_panel() -> void:
-	var box := _panel(RIGHT_WIDTH)
+	var box := _panel(RIGHT_WIDTH, true)
 	var header := HBoxContainer.new()
 	_turn_label = _label("", 22)
+	_turn_label.add_theme_font_override("font", BGCTheme.bold_font(0.6))
 	_turn_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_turn_label.clip_text = true
 	_turn_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -248,7 +272,8 @@ func _build_right_panel() -> void:
 	box.add_child(_error_label)
 
 	var dice_row := HBoxContainer.new()
-	_roll_button = _button("Tirar dados", func() -> void: _submit(G.ROLL))
+	dice_row.add_theme_constant_override("separation", 8)
+	_roll_button = _button("Tirar dados", func() -> void: _submit(G.ROLL), 15, "PrimaryButton")
 	_roll_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dice_row.add_child(_roll_button)
 	_dice_view = DiceView.new()
@@ -261,14 +286,14 @@ func _build_right_panel() -> void:
 	dice_row.add_child(_dice_label)
 	box.add_child(dice_row)
 
-	_hand_label = _label("", 13)
+	_hand_label = _section("")
 	box.add_child(_hand_label)
 	_hand_box = GridContainer.new()
 	_hand_box.columns = 5
 	_hand_box.add_theme_constant_override("h_separation", 4)
 	box.add_child(_hand_box)
 
-	box.add_child(_label("Construir", 13))
+	box.add_child(_section("Construir"))
 	var build_grid := GridContainer.new()
 	build_grid.columns = 2
 	build_grid.add_theme_constant_override("h_separation", 6)
@@ -283,13 +308,14 @@ func _build_right_panel() -> void:
 	build_grid.add_child(buy)
 	_build_buttons["dev"] = buy
 
-	box.add_child(_label("Cartas de desarrollo", 13))
+	box.add_child(_section("Cartas de desarrollo"))
 	_dev_box = VBoxContainer.new()
 	_dev_box.add_theme_constant_override("separation", 4)
 	box.add_child(_dev_box)
 
-	box.add_child(_label("Comerciar", 13))
+	box.add_child(_section("Comerciar"))
 	var trade_row := HBoxContainer.new()
+	trade_row.add_theme_constant_override("separation", 6)
 	_bank_button = _button("Con la banca", _open_bank_dialog)
 	_bank_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	trade_row.add_child(_bank_button)
@@ -301,8 +327,8 @@ func _build_right_panel() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
-	_end_button = _button("Terminar turno", func() -> void: _submit(G.END_TURN), 16)
-	_end_button.custom_minimum_size = Vector2(0, 40)
+	_end_button = _button("Terminar turno", func() -> void: _submit(G.END_TURN), 16, "PrimaryButton")
+	_end_button.custom_minimum_size = Vector2(0, 46)
 	box.add_child(_end_button)
 
 
@@ -310,8 +336,16 @@ func _build_button(text: String, callback: Callable) -> Button:
 	var button := _button(text, callback, 13)
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.custom_minimum_size = Vector2(0, 46)
+	button.custom_minimum_size = Vector2(0, 50)
 	button.clip_text = true
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var style: StyleBoxFlat = get_theme_stylebox(state, "Button").duplicate()
+		style.content_margin_left = 10
+		style.content_margin_right = 6
+		style.content_margin_top = 4
+		style.content_margin_bottom = 4
+		style.shadow_size = 0
+		button.add_theme_stylebox_override(state, style)
 	return button
 
 
@@ -327,15 +361,12 @@ func _build_overlays() -> void:
 
 	_victory = PanelContainer.new()
 	_victory.custom_minimum_size = Vector2(420, 0)
+	_victory.add_theme_stylebox_override("panel", BGCTheme.box(DIALOG_FILL, Color(1, 1, 1, 0.15), 18, 1, 18, 26))
 	_victory.visible = false
 	add_child(_victory)
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 28)
-	_victory.add_child(margin)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
-	margin.add_child(box)
+	_victory.add_child(box)
 	var title := _label("", 36)
 	title.name = "Title"
 	title.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -346,10 +377,10 @@ func _build_overlays() -> void:
 	details.autowrap_mode = TextServer.AUTOWRAP_OFF
 	details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(details)
-	var again := _button("Nueva partida (mismos jugadores)", func() -> void: _start(BGCRng.random_seed()))
+	var again := _button("Nueva partida (mismos jugadores)", func() -> void: _start(BGCRng.random_seed()), 15, "PrimaryButton")
 	again.name = "Again"
 	box.add_child(again)
-	box.add_child(_button("Volver al menú", App.go_to_menu))
+	box.add_child(_button("Volver al menú", App.go_to_menu, 15, "GhostButton"))
 
 
 func _board_rect() -> Rect2:
@@ -360,12 +391,6 @@ func _board_rect() -> Rect2:
 func _layout() -> void:
 	if _board_view == null:
 		return
-	var left: Control = _players_box.get_parent().get_parent().get_parent()
-	var right: Control = _turn_label.get_parent().get_parent().get_parent().get_parent()
-	left.position = Vector2(MARGIN, MARGIN)
-	left.size = Vector2(LEFT_WIDTH, size.y - MARGIN * 2)
-	right.position = Vector2(size.x - RIGHT_WIDTH - MARGIN, MARGIN)
-	right.size = Vector2(RIGHT_WIDTH, size.y - MARGIN * 2)
 	var board_rect := _board_rect()
 	_board_view.fit(board_rect)
 	_banner.position = board_rect.position
@@ -450,11 +475,18 @@ func _refresh() -> void:
 func _refresh_players() -> void:
 	_clear(_players_box)
 	for p in game.players:
+		var active := p.id == game.turns.current and not game.finished
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", BGCTheme.box(
+			Color(p.color, 0.16) if active else Color(1, 1, 1, 0.04),
+			Color(HIGHLIGHT, 0.9) if active else Color(1, 1, 1, 0.08), 10, 2 if active else 1, 0, 5))
 		var column := VBoxContainer.new()
 		column.add_theme_constant_override("separation", 0)
+		card.add_child(column)
 		var row := HBoxContainer.new()
-		var swatch := ColorRect.new()
-		swatch.color = p.color
+		row.add_theme_constant_override("separation", 6)
+		var swatch := Panel.new()
+		swatch.add_theme_stylebox_override("panel", BGCTheme.box(p.color, Color(1, 1, 1, 0.5), 4, 1, 0, 0))
 		swatch.custom_minimum_size = Vector2(14, 14)
 		swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(swatch)
@@ -462,8 +494,8 @@ func _refresh_players() -> void:
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_label.clip_text = true
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if p.id == game.turns.current and not game.finished:
-			name_label.text = "▶ " + name_label.text
+		name_label.add_theme_font_override("font", BGCTheme.bold_font(0.4))
+		if active:
 			name_label.add_theme_color_override("font_color", HIGHLIGHT)
 		row.add_child(name_label)
 		var points := _label("%d PV" % game.public_victory_points(p.id), 15)
@@ -471,7 +503,7 @@ func _refresh_players() -> void:
 		row.add_child(points)
 		column.add_child(row)
 
-		var details := "   %d cartas · %d desarrollo · %d milic. · camino %d" % [
+		var details := "%d cartas · %d desarrollo · %d milic. · camino %d" % [
 			game.hand_size(p.id), game.dev_hand_size(p.id), game.militia_played[p.id], game.road_lengths[p.id]]
 		var info := _label(details, 11)
 		info.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -483,11 +515,11 @@ func _refresh_players() -> void:
 		if game.largest_army_owner == p.id:
 			awards.append("★ Mayor milicia")
 		if not awards.is_empty():
-			var award := _label("   " + "   ".join(awards), 12)
+			var award := _label("   ".join(awards), 12)
 			award.add_theme_color_override("font_color", HIGHLIGHT)
 			column.add_child(award)
-		_players_box.add_child(column)
-		_player_rows[p.id] = column
+		_players_box.add_child(card)
+		_player_rows[p.id] = card
 
 
 func _refresh_dev_cards(pid: int, can_play: bool) -> void:
@@ -642,15 +674,13 @@ func _open_dialog(key: String, title: String, title_color: Color = Color.WHITE) 
 	shade.add_child(center)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(minf(420, rect.size.x - 20), 0)
+	panel.add_theme_stylebox_override("panel", BGCTheme.box(DIALOG_FILL, Color(1, 1, 1, 0.15), 18, 1, 18, 18))
 	center.add_child(panel)
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 18)
-	panel.add_child(margin)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
-	margin.add_child(box)
+	panel.add_child(box)
 	var title_label := _label(title, 22)
+	title_label.add_theme_font_override("font", BGCTheme.bold_font(0.6))
 	title_label.add_theme_color_override("font_color", title_color)
 	box.add_child(title_label)
 	_board_view.set_targets(Pick.NONE, [])

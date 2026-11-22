@@ -57,6 +57,7 @@ func _exterminator_turn(g: PestsGame, pid: int) -> void:
 	g.free_move = true
 	g.action_points = D.ACTION_POINTS
 	g.energy_moves = 0
+	g.turn_acted = false
 
 
 func _queen_turn(g: PestsGame, pid: int) -> void:
@@ -234,6 +235,17 @@ func test_energy_drink() -> void:
 	_ok(g, G.MOVE, 0, {"room": s["a"]})
 	_ok(g, G.MOVE, 0, {"room": s["e"]})
 	assert_ne(g.submit(GameAction.new(G.MOVE, 0, {"room": s["b"]})), "", "solo 4")
+
+
+func test_energy_drink_must_be_the_only_action() -> void:
+	var s := _square(D.Species.BLUE, D.Species.GREEN)
+	var g: PestsGame = s["game"]
+	_exterminator_turn(g, 0)
+	g.hands[0] = ["energy_drink"]
+	_ok(g, G.MOVE, 0, {"room": s["b"]})
+	assert_ne(_play(g, 0, "energy_drink"), "", "ya se ha movido este turno")
+	_exterminator_turn(g, 0)
+	assert_eq(_play(g, 0, "energy_drink"), "", "en un turno nuevo sí")
 
 
 func test_quik_trap() -> void:
