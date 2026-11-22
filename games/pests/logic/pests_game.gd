@@ -145,6 +145,9 @@ var free_move := false
 var action_points := 0
 ## Movimientos gratis de la Bebida energética.
 var energy_moves := 0
+## ¿Ha hecho ya el exterminador alguna acción este turno? (la Bebida
+## energética tiene que ser la única).
+var turn_acted := false
 ## Última cara del dado de la reina (-1 si aún no ha salido ninguna) y última
 ## tirada del d6.
 var last_queen_face := -1
@@ -184,6 +187,7 @@ func _on_setup() -> void:
 	free_move = false
 	action_points = 0
 	energy_moves = 0
+	turn_acted = false
 	last_queen_face = -1
 	last_roll = 0
 	# Se tira el d6 para ver quién empieza.
@@ -256,6 +260,7 @@ func clone(rng_seed: int = -1) -> PestsGame:
 	c.free_move = free_move
 	c.action_points = action_points
 	c.energy_moves = energy_moves
+	c.turn_acted = turn_acted
 	c.last_queen_face = last_queen_face
 	c.last_roll = last_roll
 	return c
@@ -691,8 +696,10 @@ func _card_target_error(pid: int, card_id: String, data: Dictionary) -> String:
 	var target_pid := int(data.get("player", -1))
 	var target_sp := species_of[target_pid] if target_pid >= 0 and target_pid < players.size() else -1
 	match card_id:
-		"more_time", "energy_drink", "mating_call", "hibernate":
+		"more_time", "mating_call", "hibernate":
 			return ""
+		"energy_drink":
+			return "La Bebida energética tiene que ser tu única acción del turno" if turn_acted else ""
 		"mind_control":
 			if not _valid_queen_action(data):
 				return "Elige la acción de la reina"
@@ -825,6 +832,9 @@ func _apply(action: GameAction) -> void:
 			var t := find_trap(int(data["trap"]))
 			var room := int(data["room"])
 			t["room"] = room
+			# La reina atrapada viaja dentro de la trampa.
+			if t["queen"]:
+				queen_room[trap_species(t)] = room
 			var from_room := exterminator_room[pid]
 			exterminator_room[pid] = room
 			event.emit(&"trap_dragged", {"player": pid, "trap": t["id"], "room": room, "from": from_room})
@@ -870,6 +880,7 @@ func _apply(action: GameAction) -> void:
 func _pay(pid: int, type: StringName, data: Dictionary) -> void:
 	if type in [GIVE_CARD, TAKE_CARD]:
 		return  # intercambiar cartas es gratis y no gasta el movimiento gratis
+	turn_acted = true
 	if type == MOVE:
 		if energy_moves > 0:
 			energy_moves -= 1
@@ -1173,6 +1184,7 @@ func _begin_exterminator(pid: int) -> void:
 	free_move = true
 	action_points = D.ACTION_POINTS
 	energy_moves = 0
+	turn_acted = false
 	for e in effects_on(pid):
 		if e["card"] == "stuck":
 			free_move = false

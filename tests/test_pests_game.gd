@@ -51,6 +51,7 @@ func _exterminator_turn(g: PestsGame, pid: int) -> void:
 	g.phase = G.Phase.EXTERMINATOR
 	g.free_move = true
 	g.action_points = D.ACTION_POINTS
+	g.turn_acted = false
 
 
 func _put(g: PestsGame, sp: int, room: int, count: int) -> void:
@@ -448,6 +449,23 @@ func test_drag_trap() -> void:
 	assert_eq(g.find_trap(9)["pests"], 3, "atrapa lo que hay al llegar")
 	assert_eq(g.action_points, 0)
 	assert_false(g.free_move)
+
+
+func test_dragged_trap_carries_its_queen() -> void:
+	var s := _square(D.Species.BLUE, D.Species.GREEN)
+	var g: PestsGame = s["game"]
+	var sp := D.Species.BLUE
+	g.queen_room[sp] = s["e"]
+	g.traps.append({"id": 5, "owner": 0, "room": s["e"], "pests": 0, "queen": true, "prefer_queen": true})
+	_exterminator_turn(g, 0)
+	_ok(g, G.DRAG_TRAP, 0, {"trap": 5, "room": s["b"]})
+	assert_eq(g.queen_room[sp], s["b"], "la reina va dentro de la trampa")
+	# Si rompen la trampa, la reina queda libre donde está la trampa.
+	_exterminator_turn(g, 1)
+	g.exterminator_room[1] = s["b"]
+	_ok(g, G.DESTROY_TRAP, 1, {"trap": 5})
+	assert_false(g.is_queen_trapped(sp))
+	assert_eq(g.queen_room[sp], s["b"])
 
 
 func test_seal_and_unseal() -> void:
